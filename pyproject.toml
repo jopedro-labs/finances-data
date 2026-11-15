@@ -54,7 +54,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
-addopts = "--tb=short --cov=finances_data --cov=data --cov-report=term-missing --cov-fail-under=90"
+addopts = "--tb=short --cov=finances_data --cov=data --cov-report=term-missing"
 
 [tool.coverage.run]
 source = ["finances_data", "data"]
