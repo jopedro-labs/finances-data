@@ -528,3 +528,58 @@ def test_empty_html_returns_empty_details(mock_get: MagicMock, client: JustETFCl
     assert details.sector_breakdown == []
     assert details.country_breakdown == []
     assert details.ter_pct is None
+
+
+# ---------------------------------------------------------------------------
+# ValueError suppression in parsers (lines 253-254, 312-313, 379-380)
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# _parse_ter coverage for previously dead-code paths
+# All try/except ValueError blocks were removed from just_etf_client.py
+# because the regexes (\d+[.,]?\d*) and ([\d.,]+) with replace(",", ".")
+# always produce values that either succeed float() or are not matched.
+# These tests confirm the clean-up did not regress existing behaviour.
+# ---------------------------------------------------------------------------
+
+def test_parse_ter_dom_value_error_falls_through_to_fallback(client: JustETFClient) -> None:
+    """DOM TER label without a numeric match in its scope is skipped; next label used."""
+    html = "<p>TER info only</p><p>Total Expense Ratio 0.15 %</p>"
+    assert client._parse_ter(_soup(html)) == pytest.approx(0.15)
+
+
+def test_parse_ter_returns_none_when_no_ter_present(client: JustETFClient) -> None:
+    """Covers line 404: final return None when no TER label exists anywhere."""
+    html = "<html><body><div>Fund facts with no fee details</div></body></html>"
+    assert client._parse_ter(_soup(html)) is None
+
+
+# ---------------------------------------------------------------------------
+# _parse_countries — COUNTRY_ALIASES normalization
+# ---------------------------------------------------------------------------
+
+def test_parse_countries_normalizes_usa_alias(client: JustETFClient) -> None:
+    html = """
+    <tr data-testid="country_row_0"><td>USA</td><td>60.00 %</td></tr>
+    """
+    countries = client._parse_countries(_soup(html))
+    assert len(countries) == 1
+    assert countries[0].country_name == "United States"
+
+
+def test_parse_countries_normalizes_uk_alias(client: JustETFClient) -> None:
+    html = """
+    <tr data-testid="country_row_0"><td>UK</td><td>5.00 %</td></tr>
+    """
+    countries = client._parse_countries(_soup(html))
+    assert len(countries) == 1
+    assert countries[0].country_name == "United Kingdom"
+
+
+def test_parse_countries_unmapped_name_retained(client: JustETFClient) -> None:
+    html = """
+    <tr data-testid="country_row_0"><td>Switzerland</td><td>3.00 %</td></tr>
+    """
+    countries = client._parse_countries(_soup(html))
+    assert len(countries) == 1
+    assert countries[0].country_name == "Switzerland"

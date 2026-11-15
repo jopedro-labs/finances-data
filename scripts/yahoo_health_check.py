@@ -37,18 +37,13 @@ def main() -> None:
     try:
         client = YahooFinanceClient()
         quote = client.get_quotation("IWDA.AS")
-        if quote:
-            print("✅ Yahoo Finance API is UP (quote retrieved successfully).")
-            _write_github_output("ok")
-            if webhook_url:
-                _notify(webhook_url, f"✅ **Yahoo Finance Monitor**: API is operational.\n🔗 {run_url}")
-            sys.exit(0)
-        else:
-            print("⚠️ Yahoo Finance API returned an empty quote response.")
-            _write_github_output("error")
-            if webhook_url:
-                _notify(webhook_url, f"⚠️ **Yahoo Finance Monitor**: Empty response.\n🔗 {run_url}")
-            sys.exit(1)
+        if not quote or quote.price <= 0.0 or not quote.currency:
+            raise YahooFinanceError(f"Health check received invalid quotation payload: {quote}")
+        print("✅ Yahoo Finance API is UP (quote retrieved successfully).")
+        _write_github_output("ok")
+        if webhook_url:
+            _notify(webhook_url, f"✅ **Yahoo Finance Monitor**: API is operational.\n🔗 {run_url}")
+        sys.exit(0)
     except YahooFinanceError as e:
         print(f"❌ Yahoo Finance API check failed: {e}")
         _write_github_output("error")
