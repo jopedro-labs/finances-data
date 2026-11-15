@@ -27,7 +27,7 @@ class YahooFinanceClient:
         try:
             t: yf.Ticker = yf.Ticker(ticker)
             try:
-                info = t.info
+                info: dict[str, Any] = t.info
             except Exception as e:
                 raise YahooFinanceError(
                     f"Failed to retrieve info for ticker '{ticker}': {e}"
@@ -42,7 +42,7 @@ class YahooFinanceClient:
             if price is None:
                 raise YahooFinanceError(f"Invalid or missing close price for ticker '{ticker}'.")
 
-            currency_str = info.get("currency")
+            currency_str: Any = info.get("currency")
             if not currency_str:
                 raise YahooFinanceError(f"Currency information is missing for ticker '{ticker}'.")
             currency: str = str(currency_str).upper()
@@ -57,30 +57,32 @@ class YahooFinanceClient:
 
     def get_quotation(self, ticker: str) -> Quotation:
         """Fetches the latest quotation for a given ticker symbol."""
-        try:
-            price, currency, _ = self._fetch_ticker_market_data(ticker)
-            return Quotation(
-                price=price,
-                currency=currency,
-                timestamp=datetime.now(timezone.utc),
-                native_price=price,
-                native_currency=currency,
-            )
-        except YahooFinanceError:
-            raise
-        except Exception as e:
-            raise YahooFinanceError(f"Failed to fetch quotation for ticker '{ticker}': {e}") from e
+        price: float
+        currency: str
+        price, currency, _ = self._fetch_ticker_market_data(ticker)
+        return Quotation(
+            price=price,
+            currency=currency,
+            timestamp=datetime.now(timezone.utc),
+            native_price=price,
+            native_currency=currency,
+        )
 
     def get_stock_details(self, ticker: str) -> StockDetails:
         """Fetches fundamental metrics and valuation ratios for a stock ticker."""
         try:
             t: yf.Ticker = yf.Ticker(ticker)
+            info: dict[str, Any]
             try:
                 info = t.info
             except Exception as e:
                 raise YahooFinanceError(
                     f"Failed to retrieve info for ticker '{ticker}': {e}"
                 ) from e
+
+            change_52w: Any = info.get("52WeekChange")
+            if change_52w is None:
+                change_52w = info.get("fiftyTwoWeekChangePercent")
 
             return StockDetails(
                 market_cap=_safe_float(info.get("marketCap")),
@@ -89,7 +91,7 @@ class YahooFinanceClient:
                 dividend_yield_pct=_safe_float(info.get("dividendYield"), scale=100.0),
                 fifty_two_week_high=_safe_float(info.get("fiftyTwoWeekHigh")),
                 fifty_two_week_low=_safe_float(info.get("fiftyTwoWeekLow")),
-                fifty_two_week_change_pct=_safe_float(info.get("52WeekChange"), scale=100.0),
+                fifty_two_week_change_pct=_safe_float(change_52w, scale=100.0),
                 fifty_day_average=_safe_float(info.get("fiftyDayAverage")),
                 two_hundred_day_average=_safe_float(info.get("twoHundredDayAverage")),
                 average_volume=_safe_int(info.get("averageVolume")),
@@ -127,27 +129,27 @@ class YahooFinanceClient:
 
     def get_etf_market_data(self, ticker: str) -> ETFMarketData:
         """Fetches market pricing and moving averages for an ETF ticker efficiently."""
-        try:
-            price, currency, info = self._fetch_ticker_market_data(ticker)
+        price: float
+        currency: str
+        info: dict[str, Any]
+        price, currency, info = self._fetch_ticker_market_data(ticker)
 
-            return ETFMarketData(
-                price=price,
-                native_currency=currency,
-                just_etf_ticker=None,
-                nav_price=_safe_float(info.get("navPrice")),
-                fifty_two_week_high=_safe_float(info.get("fiftyTwoWeekHigh")),
-                fifty_two_week_low=_safe_float(info.get("fiftyTwoWeekLow")),
-                fifty_two_week_change_pct=_safe_float(info.get("52WeekChange"), scale=100.0),
-                fifty_day_average=_safe_float(info.get("fiftyDayAverage")),
-                two_hundred_day_average=_safe_float(info.get("twoHundredDayAverage")),
-                average_volume=_safe_int(info.get("averageVolume")),
-            )
-        except YahooFinanceError:
-            raise
-        except Exception as e:
-            raise YahooFinanceError(
-                f"Failed to fetch ETF market data for ticker '{ticker}': {e}"
-            ) from e
+        change_52w: Any = info.get("52WeekChange")
+        if change_52w is None:
+            change_52w = info.get("fiftyTwoWeekChangePercent")
+
+        return ETFMarketData(
+            price=price,
+            native_currency=currency,
+            just_etf_ticker=None,
+            nav_price=_safe_float(info.get("navPrice")),
+            fifty_two_week_high=_safe_float(info.get("fiftyTwoWeekHigh")),
+            fifty_two_week_low=_safe_float(info.get("fiftyTwoWeekLow")),
+            fifty_two_week_change_pct=_safe_float(change_52w, scale=100.0),
+            fifty_day_average=_safe_float(info.get("fiftyDayAverage")),
+            two_hundred_day_average=_safe_float(info.get("twoHundredDayAverage")),
+            average_volume=_safe_int(info.get("averageVolume")),
+        )
 
 
 def _safe_float(val: Any, scale: float = 1.0) -> float | None:

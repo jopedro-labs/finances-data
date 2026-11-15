@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup, Tag
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
+from data.common.constants import COUNTRY_ALIASES
 from data.models import CountryExposure, ETFDetails, Holding, SectorExposure
 
 
@@ -239,18 +240,15 @@ class JustETFClient:
                 weight_text: str = cols[-1].get_text(strip=True)
                 match: re.Match[str] | None = re.search(r"(\d+[.,]?\d*)\s*%", weight_text)
                 if match:
-                    try:
-                        weight_pct: float = float(match.group(1).replace(",", "."))
-                        holdings.append(
-                            Holding(
-                                name=name,
-                                isin=isin,
-                                weight_pct=weight_pct,
-                                just_etf_ticker=None,
-                            )
+                    weight_pct: float = float(match.group(1).replace(",", "."))
+                    holdings.append(
+                        Holding(
+                            name=name,
+                            isin=isin,
+                            weight_pct=weight_pct,
+                            just_etf_ticker=None,
                         )
-                    except ValueError:
-                        continue
+                    )
 
         return holdings
 
@@ -300,16 +298,13 @@ class JustETFClient:
                 weight_text: str = cols[-1].get_text(strip=True)
                 match: re.Match[str] | None = re.search(r"(\d+[.,]?\d*)\s*%", weight_text)
                 if match:
-                    try:
-                        weight_pct: float = float(match.group(1).replace(",", "."))
-                        sectors.append(
-                            SectorExposure(
-                                sector_name=sector_name,
-                                weight_pct=weight_pct,
-                            )
+                    weight_pct: float = float(match.group(1).replace(",", "."))
+                    sectors.append(
+                        SectorExposure(
+                            sector_name=sector_name,
+                            weight_pct=weight_pct,
                         )
-                    except ValueError:
-                        continue
+                    )
 
         return sectors
 
@@ -365,16 +360,14 @@ class JustETFClient:
                 weight_text: str = cols[-1].get_text(strip=True)
                 match: re.Match[str] | None = re.search(r"(\d+[.,]?\d*)\s*%", weight_text)
                 if match:
-                    try:
-                        weight_pct: float = float(match.group(1).replace(",", "."))
-                        countries.append(
-                            CountryExposure(
-                                country_name=country_name,
-                                weight_pct=weight_pct,
-                            )
+                    weight_pct: float = float(match.group(1).replace(",", "."))
+                    normalized_name: str = COUNTRY_ALIASES.get(country_name.upper(), country_name)
+                    countries.append(
+                        CountryExposure(
+                            country_name=normalized_name,
+                            weight_pct=weight_pct,
                         )
-                    except ValueError:
-                        continue
+                    )
 
         return countries
 
@@ -400,22 +393,6 @@ class JustETFClient:
                     re.IGNORECASE,
                 )
                 if match:
-                    try:
-                        return float(match.group(1).replace(",", "."))
-                    except ValueError:
-                        pass
-
-        # Global text search fallback if DOM traversal fails
-        text: str = soup.get_text(separator="\n", strip=True)
-        fallback_match: re.Match[str] | None = re.search(
-            r"(?:TER|Total\s*Expense\s*Ratio)[^\n%]*?([\d.,]+)\s*%",
-            text,
-            re.IGNORECASE,
-        )
-        if fallback_match:
-            try:
-                return float(fallback_match.group(1).replace(",", "."))
-            except ValueError:
-                pass
+                    return float(match.group(1).replace(",", "."))
 
         return None
