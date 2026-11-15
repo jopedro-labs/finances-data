@@ -32,7 +32,7 @@ jobs:
       - name: Run JustETF tests
         id: tests
         run: |
-          python -m pytest test/test_just_etf.py --tb=short -q 2>&1 | tee test_output.txt
+          python -m pytest test/test_just_etf.py --tb=short -q --no-cov 2>&1 | tee test_output.txt
           echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
         shell: bash
         continue-on-error: true
