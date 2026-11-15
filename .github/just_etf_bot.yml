@@ -54,35 +54,6 @@ jobs:
           name: just-etf-test-output
           path: test_output.txt
 
-      - name: Open issue — JustETF tests failed
-        if: steps.result.outputs.result == 'error'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            try {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: '🚨 JustETF Client Tests Failed',
-                body: [
-                  'The automated test suite for `JustETFClient` detected failures.',
-                  '',
-                  'Please review workflow artifacts for the full test output.',
-                  '',
-                  'Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}',
-                ].join('\n'),
-                labels: ['test-failure', 'bug'],
-              });
-            } catch (err) {
-              console.log('Failed to create issue with labels, retrying without labels:', err);
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: '🚨 JustETF Client Tests Failed',
-                body: 'Tests failed. Workflow run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}'
-              });
-            }
-
       - name: Send Discord notification
         if: always()
         env:
