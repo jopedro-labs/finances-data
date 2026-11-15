@@ -1,5 +1,3 @@
-# finances-data
-
 ![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Version](https://img.shields.io/badge/version-0.1.0-58a6ff?style=flat-square)
 ![Test JustETF Client](https://github.com/jopedro-labs/finances-data/actions/workflows/just_etf_bot.yml/badge.svg)
@@ -7,10 +5,12 @@
 <br />
 ![Linter](https://img.shields.io/badge/linter-Ruff-000000?style=flat-square&logo=python&logoColor=white)
 ![Type Check](https://img.shields.io/badge/types-mypy%20strict-2A6DB2?style=flat-square&logo=python&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=flat-square&logo=pytest&logoColor=white)
+![Gemini AI](https://img.shields.io/badge/Gemini_AI-8E75B2?style=flat-square&logo=googlegemini&logoColor=white)
 ![GNU Make](https://img.shields.io/badge/env-GNU%20Make-active?style=flat-square&logo=gnu-make&logoColor=white)
 ![MIT License](https://img.shields.io/badge/license-MIT-607D8B?style=flat-square)
 
-Python client library for financial market data. Provides an ETF scraper for JustETF and a market data client for Yahoo Finance, with shared immutable domain models.
+Python client library for financial market data. Provides an ETF scraper for JustETF and a market data client for Yahoo Finance, with shared immutable domain models and autonomous code quality evaluation tools.
 
 ---
 
@@ -25,7 +25,7 @@ pip install -e ".[dev]"
 
 ---
 
-## Modules
+## Modules & Tools
 
 ### `finances_data.just_etf`
 
@@ -91,6 +91,27 @@ Immutable domain dataclasses (`frozen=True, slots=True`) shared across both clie
 
 ---
 
+## Autonomous Quality Assurance & Test Gap Evaluation Agent
+
+An internal developer utility (`scripts/quality_eval_agent.py`) powered by Gemini AI that acts as an autonomous quality assurance auditor within the repository.
+
+### Core Validation Pillars Evaluated:
+
+1. **Unit Tests:** Isolated verification and mocking via `pytest`.
+2. **Integration Tests:** Component and adapter interaction verification.
+3. **Static Code Analysis:** Type safety (`mypy`) and linting (`ruff`).
+4. **Mutation Testing Readiness:** Assessment of test suite robustness against code changes.
+5. **Black-Box Verification:** Functional and behavioral validation.
+
+### Execution:
+
+```bash
+make quality-eval-agent
+```
+
+The agent automatically executes the test suite with coverage, gathers repository context, analyzes coverage gaps and validation metrics via the configured Gemini model (`GEMINI_MODEL`), and generates a structured markdown report under `reports/validation_gap_report.md`.
+
+---
 ## GitHub Actions
 
 ### `just_etf_bot.yml` — Test JustETF Client
@@ -124,6 +145,13 @@ For local simulation, create a `.env` file (never commit it):
 ```
 INFRA_ALERTS_DISCORD_WEBHOOK=https://discord.com/api/webhooks/...
 ```
+---
+
+## Requirements
+
+- Python >= 3.10
+- Core parsing/client libraries: `beautifulsoup4`, `yfinance`, `requests`
+- Quality Evaluation Agent: Requires `google-generativeai` (or `google.genai`), `python-dotenv`, and an active `GEMINI_API_KEY`
 
 ---
 
@@ -143,13 +171,14 @@ make check
 
 Individual commands:
 
-| Command | Description |
-|---|---|
-| `make lint` | Lint with Ruff |
-| `make lint-fix` | Lint with auto-fix |
-| `make type` | Type check with mypy strict |
-| `make test` | Run tests with pytest |
-| `make check` | Run all three in sequence |
+| Command                   | Description                              |
+|---------------------------|------------------------------------------|
+| `make lint`               | Lint with Ruff                           |
+| `make lint-fix`           | Lint with auto-fix                       |
+| `make type`               | Type check with mypy strict              |
+| `make test`               | Run tests with pytest                    |
+| `make quality-eval-agent` | Run AI quality audit & test gap analysis |
+| `make check`              | Run all three in sequence                |
 
 ---
 
