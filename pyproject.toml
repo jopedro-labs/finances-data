@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "finances-data"
+version = "0.1.0"
+description = "Finance data infrastructure clients"
+requires-python = ">=3.10"
+readme = "readme.md"
+dependencies = [
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "yfinance>=0.2",
+    "urllib3>=2.0",
+    "core-lib[discord] @ git+https://github.com/jopedro-labs/core-lib.git",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "types-requests>=2.28",
+    "types-beautifulsoup4>=4.12",
+    "python-dotenv>=1.0",
+    "google-generativeai>=0.4",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["finances_data*", "data*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+files = ["finances_data", "data"]
+
+[[tool.mypy.overrides]]
+module = [
+    "bs4.*",
+    "yfinance.*",
+    "core_lib.*",
+]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["test"]
+addopts = "--tb=short"
+
+[tool.coverage.run]
+source = ["finances_data", "data"]
+omit = ["test/*", "scripts/*"]
+
+[tool.coverage.report]
+show_missing = true
