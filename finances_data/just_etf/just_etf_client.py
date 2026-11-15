@@ -14,6 +14,7 @@ from urllib3.util import Retry
 
 from data.models import CountryExposure, ETFDetails, Holding, SectorExposure
 
+
 class JustETFScrapeError(Exception):
     """Raised when scraping or parsing JustETF data fails."""
 
