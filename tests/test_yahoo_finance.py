@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
+
 import pandas as pd
 import pytest
 
+from data.models import ETFMarketData, Quotation, StockDetails
 from finances_data.yahoo_finance import YahooFinanceClient, YahooFinanceError
-from data.models import Quotation, StockDetails, ETFMarketData
 
 
 @patch("yfinance.Ticker")

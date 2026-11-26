@@ -6,6 +6,8 @@ import os
 import sys
 
 from core_lib.discord import DiscordNotificationError, DiscordNotifier
+from core_lib.logger import logger
+
 from finances_data.yahoo_finance import YahooFinanceClient, YahooFinanceError
 
 
@@ -21,7 +23,7 @@ def _notify(webhook_url: str, message: str) -> None:
         with DiscordNotifier(webhook_url=webhook_url) as notifier:
             notifier.send_message(message)
     except DiscordNotificationError as e:
-        print(f"⚠️ Discord notification failed: {e}")
+        logger.warning(f"⚠️ Discord notification failed: {e}")
 
 
 def main() -> None:
@@ -33,25 +35,25 @@ def main() -> None:
     webhook_url = os.environ.get("INFRA_ALERTS_DISCORD_WEBHOOK")
     run_url = os.environ.get("RUN_URL", "")
 
-    print("🔍 Checking Yahoo Finance API status...")
+    logger.info("🔍 Checking Yahoo Finance API status...")
     try:
         client = YahooFinanceClient()
         quote = client.get_quotation("IWDA.AS")
         if not quote or quote.price <= 0.0 or not quote.currency:
             raise YahooFinanceError(f"Health check received invalid quotation payload: {quote}")
-        print("✅ Yahoo Finance API is UP (quote retrieved successfully).")
+        logger.info("✅ Yahoo Finance API is UP (quote retrieved successfully).")
         _write_github_output("ok")
         if webhook_url:
             _notify(webhook_url, f"✅ **Yahoo Finance Monitor**: API is operational.\n🔗 {run_url}")
         sys.exit(0)
     except YahooFinanceError as e:
-        print(f"❌ Yahoo Finance API check failed: {e}")
+        logger.error(f"❌ Yahoo Finance API check failed: {e}")
         _write_github_output("error")
         if webhook_url:
             _notify(webhook_url, f"🚨 **Yahoo Finance Monitor**: Check failed.\n🔗 {run_url}")
         sys.exit(1)
     except Exception as e:
-        print(f"❌ Unexpected error while checking Yahoo Finance API: {e}")
+        logger.exception(f"❌ Unexpected error while checking Yahoo Finance API: {e}")
         _write_github_output("error")
         if webhook_url:
             _notify(webhook_url, f"🚨 **Yahoo Finance Monitor**: Unexpected error.\n🔗 {run_url}")

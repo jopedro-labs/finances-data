@@ -115,15 +115,15 @@ This document provides a factual, read-only comprehensive audit of the `finances
   - Acceptance Criteria: Add integration/unit test fixtures featuring complex multi-table HTML structures with decoy tables to verify robust parser disambiguation.
 
 - [ ] **Missing Out-of-Process CLI Black-Box Tests for Automation Scripts**:
-  - None of the scripts in `scripts/` (`notify_discord.py`, `quality_eval_agent.py`, `yahoo_health_check.py`) have dedicated unit or CLI invocation tests in `test/`.
+  - None of the scripts in `scripts/` (`notify_discord.py`, `quality_eval_agent.py`, `yahoo_health_check.py`) have dedicated unit or CLI invocation tests in `tests/`.
   - Missing coverage for CLI exit codes (`0` vs `1`), environment variable absence handling, and error output propagation.
-  - Acceptance Criteria: Add test modules (e.g., `test/test_scripts.py`) testing script execution, parameter passing, and environment variable fallbacks via `subprocess` or runner mocks.
+  - Acceptance Criteria: Add test modules (e.g., `tests/test_scripts.py`) testing script execution, parameter passing, and environment variable fallbacks via `subprocess` or runner mocks.
 
 ---
 
-## 4. Tooling, CI/CD & Repository Alignment with `core-lib`
+## 4. Tooling, CI/CD & Repository Alignment with core-lib
 
-- [ ] **`Makefile` Discrepancies and Missing Targets**:
+- [x] **`Makefile` Discrepancies and Missing Targets**:
   - Compared to `/home/jopedro/dev/repos/core-lib/Makefile`:
     - `finances-data/Makefile` uses naked `python3 -m pip install` and system `python3` instead of a contained virtual environment (`.venv/bin/python3`, `.venv/.installed` stamp).
     - Missing `validate-audit` target: `core-lib` enforces AUDIT.md integrity and sync checks via `make validate-audit` and `scripts/validate_audit_sync.py`.
@@ -131,19 +131,19 @@ This document provides a factual, read-only comprehensive audit of the `finances
     - Missing `clean-venv` target.
   - Acceptance Criteria: Modernize `Makefile` with `.venv` isolation, `.installed` stamp, `validate-audit`, and corrected `act` paths matching `core-lib`.
 
-- [ ] **CI Workflow Configuration Drift (`.github/workflows/ci.yml`)**:
+- [x] **CI Workflow Configuration Drift (`.github/workflows/ci.yml`)**:
   - In `finances-data/.github/workflows/ci.yml`:
     - Missing `permissions: contents: read` block.
     - Lint and type check steps run only against `finances_data` (`ruff check finances_data`, `mypy finances_data`), ignoring `data/`, `scripts/`, and `test/`.
     - Missing AUDIT.md validation step (`python scripts/validate_audit_sync.py --enforce-sync`).
   - Acceptance Criteria: Update `ci.yml` to specify explicit permissions, inspect `finances_data data scripts test`, and run AUDIT synchronization checks.
 
-- [ ] **Missing AUDIT Integrity & Sync Script (`scripts/validate_audit_sync.py`)**:
+- [x] **Missing AUDIT Integrity & Sync Script (`scripts/validate_audit_sync.py`)**:
   - `core-lib` includes `scripts/validate_audit_sync.py` to ensure that `AUDIT.md` maintains required section headers, valid checkbox syntax, and is updated whenever monitored paths are changed.
   - `finances-data` currently lacks this validation script and its accompanying test suite (`test/test_validate_audit_sync.py`).
   - Acceptance Criteria: Introduce `scripts/validate_audit_sync.py` and unit tests in `finances-data`, configured to monitor `finances_data/`, `data/`, `scripts/`, `pyproject.toml`, and `.github/workflows/`.
 
-- [ ] **`pyproject.toml` Tooling Alignment & Dependency Tightening**:
+- [x] **`pyproject.toml` Tooling Alignment & Dependency Tightening**:
   - In `finances-data/pyproject.toml`:
     - `name = "finances-data"` (uses hyphen), but `core_lib` is declared as `jopedro-core-lib>=0.2.0`.
     - `[tool.mypy]` specifies `files = ["finances_data", "data"]`, omitting `scripts` and `test`.

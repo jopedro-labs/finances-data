@@ -8,18 +8,20 @@ gap analysis report using the Gemini API.
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
 import sys
+from pathlib import Path
 
 import google.generativeai as genai
+from core_lib.logger import logger
 from dotenv import load_dotenv
+
 load_dotenv()
 
 
 def run_pytest() -> tuple[int, str]:
     """Execute the pytest test suite via current python interpreter and capture output."""
-    print("🧪 Running test suite via pytest...")
+    logger.info("🧪 Running test suite via pytest...")
     result = subprocess.run(
         [sys.executable, "-m", "pytest", "--cov=.", "--cov-report=term-missing", "-v"],
         capture_output=True,
@@ -52,14 +54,14 @@ def evaluate_with_gemini(codebase_context: str, test_output: str) -> str:
     """Invoke Gemini API to analyze validation gaps across the 5 pillars."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
-        print("❌ Error: GEMINI_API_KEY environment variable is not set.")
+        logger.error("❌ Error: GEMINI_API_KEY environment variable is not set.")
         sys.exit(1)
 
     genai.configure(api_key=api_key)
 
     # Read model name from .env or fallback to gemini-3.1-pro-preview
     model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-pro-preview")
-    print(f"🤖 Initializing Gemini model [{model_name}] for evaluation...")
+    logger.info(f"🤖 Initializing Gemini model [{model_name}] for evaluation...")
     model = genai.GenerativeModel(model_name)
 
     prompt = f"""
@@ -85,14 +87,14 @@ Provide a rigorous markdown report identifying:
 - Concrete recommendations for new unit/integration tests to reach robust coverage.
 """
 
-    print("🤖 Analyzing codebase and test gaps with Gemini...")
+    logger.info("🤖 Analyzing codebase and test gaps with Gemini...")
     response = model.generate_content(prompt)
-    return response.text
+    return str(response.text)
 
 
 def main() -> None:
     """Execute the end-to-end evaluation agent workflow."""
-    print("🚀 Starting Autonomous Evaluation Agent...")
+    logger.info("🚀 Starting Autonomous Evaluation Agent...")
 
     # 1. Run tests
     exit_code, test_output = run_pytest()
@@ -108,13 +110,13 @@ def main() -> None:
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(report, encoding="utf-8")
 
-    print(f"✅ Evaluation complete. Report saved to {report_path}")
+    logger.info(f"✅ Evaluation complete. Report saved to {report_path}")
 
     if exit_code != 0:
-        print("⚠️ Test suite reported failures.")
+        logger.warning("⚠️ Test suite reported failures.")
         sys.exit(exit_code)
     else:
-        print("✅ Test suite passed successfully.")
+        logger.info("✅ Test suite passed successfully.")
         sys.exit(0)
 
 
