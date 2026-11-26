@@ -8,6 +8,7 @@ gap analysis report using the Gemini API.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import subprocess
 import sys
 
@@ -103,10 +104,9 @@ def main() -> None:
     report = evaluate_with_gemini(codebase_context, test_output)
 
     # 4. Save report
-    os.makedirs("reports", exist_ok=True)
-    report_path = "reports/validation_gap_report.md"
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.write(report)
+    report_path = Path("reports/validation_gap_report.md")
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_path.write_text(report, encoding="utf-8")
 
     print(f"✅ Evaluation complete. Report saved to {report_path}")
 

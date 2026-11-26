@@ -7,7 +7,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
 
 ## 1. Missing Local Files & Environment Setup
 
-- [ ] **Missing Root `.env.example` Configuration Template**:
+- [x] **Missing Root `.env.example` Configuration Template**:
   - The repository relies on environment variables across `scripts/` (`notify_discord.py`, `quality_eval_agent.py`, `yahoo_health_check.py`) and GitHub Actions workflows (`just_etf_bot.yml`, `yahoo_bot.yml`), but provides no tracked `.env.example` template.
   - Runtime and automation scripts expect the following environment variables:
     - `INFRA_ALERTS_DISCORD_WEBHOOK`: Discord incoming webhook URL for CI/bot health notifications (used in `scripts/notify_discord.py` and `scripts/yahoo_health_check.py`). Optional locally, mandatory for automated alerts.
@@ -18,13 +18,13 @@ This document provides a factual, read-only comprehensive audit of the `finances
     - `GEMINI_MODEL`: Gemini model identifier in `scripts/quality_eval_agent.py` (defaults to `gemini-3.1-pro-preview` in `finances-data`, whereas `core-lib` standardizes on `gemini-2.5-flash`). Optional.
   - Acceptance Criteria: Create and commit `.env.example` documenting all 6 variables with clear usage descriptions and default values.
 
-- [ ] **Missing Local Runtime Artifacts & Storage Directories**:
+- [x] **Missing Local Runtime Artifacts & Storage Directories**:
   - Missing local runtime directories expected by scripts and workflows:
     - `logs/`: `yahoo_bot.yml` uploads `logs/yahoo_monitor.log` upon failure, but `scripts/yahoo_health_check.py` does not initialize or configure file logging to `logs/yahoo_monitor.log`. Local executions fail if the directory does not exist or logging is not configured.
     - `reports/`: Created dynamically by `scripts/quality_eval_agent.py` (`reports/validation_gap_report.md`), but untracked in source control.
   - Acceptance Criteria: Add `.gitkeep` or automated `mkdir(exist_ok=True)` guards across logging/reporting utilities.
 
-- [ ] **Gaps in `.gitignore` vs Benchmark (`core-lib`)**:
+- [x] **Gaps in `.gitignore` vs Benchmark (`core-lib`)**:
   - Inspecting `finances-data/.gitignore` against `/home/jopedro/dev/repos/core-lib/.gitignore` reveals critical missing ignore patterns:
     - Missing environment & secret files: `.env`, `.env.*`, `!.env.example`, `secrets/`.
     - Missing coverage artifacts: `.coverage`, `htmlcov/`.
