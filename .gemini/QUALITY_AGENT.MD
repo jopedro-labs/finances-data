@@ -52,6 +52,3 @@ When invoked locally, the evaluation agent performs the following sequential ste
 |---|---|---|---|
 | `GEMINI_API_KEY` | Yes | API key authorized to invoke the Gemini API (loaded from `.env` or shell environment). | *Required* |
 | `GEMINI_MODEL` | No | Gemini model identifier used for code and test gap reasoning. | `gemini-3.8-flash` |
-```[cite: 12]
-
-Se quiseres usar exatamente o mesmo texto no `finances-lab`, basta trocar `finances-data` e `finances_data/` pelos nomes reais do repositório e do pacote nesse projeto[cite: 12].

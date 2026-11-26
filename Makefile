@@ -6,7 +6,7 @@ PYTHON := $(VENV)/bin/python3
 PIP := $(VENV)/bin/pip
 STAMP := $(VENV)/.installed
 
-.PHONY: venv install check lint lint-fix type test quality-eval-agent run-yahoo-health run-just-etf-bot run-yahoo-bot clean-venv validate-audit
+.PHONY: venv install check lint lint-fix type test quality-eval-agent run-just-etf-health run-yahoo-health run-just-etf-bot run-yahoo-bot clean-venv validate-audit
 
 $(VENV)/bin/activate:
 	python3 -m venv $(VENV)
@@ -56,6 +56,9 @@ run-yahoo-bot:
 		-W .github/workflows/yahoo_bot.yml \
 		--secret-file .env \
 		--verbose
+
+run-just-etf-health: install
+	$(PYTHON) scripts/just_etf_health_check.py
 
 run-yahoo-health: install
 	$(PYTHON) scripts/yahoo_health_check.py
