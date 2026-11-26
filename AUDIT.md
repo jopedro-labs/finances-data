@@ -45,7 +45,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
   - Furthermore, `yahoo_bot.yml` attempts to upload `logs/yahoo_monitor.log` on failure, but `scripts/yahoo_health_check.py` never writes to a log file or configures a file logger.
   - Acceptance Criteria: Replace operational `print()` calls in `scripts/` with `core_lib.logger` (`get_logger`, `info`, `warning`, `error`, `exception`), configuring an operational file handler writing to `logs/yahoo_monitor.log` where expected by CI artifacts.
 
-- [ ] **Deprecated `google-generativeai` SDK in `quality_eval_agent.py` and `pyproject.toml`**:
+- [x] **Deprecated `google-generativeai` SDK in `quality_eval_agent.py` and `pyproject.toml`**:
   - `scripts/quality_eval_agent.py` imports deprecated `google.generativeai as genai` (line 14) and specifies `model_name = os.environ.get("GEMINI_MODEL", "gemini-3.1-pro-preview")`.
   - `pyproject.toml` declares `"google-generativeai>=0.4"` under optional dev dependencies.
   - In `core-lib`, `scripts/quality_eval_agent.py` and `pyproject.toml` were modernized to the official Google GenAI SDK (`from google import genai`) with `"google-genai>=0.1.1"` and default model `"gemini-2.5-flash"`.
