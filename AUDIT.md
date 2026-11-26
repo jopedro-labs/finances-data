@@ -85,7 +85,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
     `Quotation` and `ETFMarketData` accept negative prices or volume figures without validation.
   - Acceptance Criteria: Add invariant validation in model factories (`from_dict` and `__post_init__` checks) asserting `0.0 <= weight_pct <= 100.0` and `price >= 0.0`.
 
-- [ ] **Migration from `TODO.md` — Workflow Scheduling Alignment**:
+- [x] **Migration from `TODO.md` — Workflow Scheduling Alignment**:
   - `TODO.md` specified:
     - `workflows should run on Thursdays`
     - `**Item 3:** Analyze quality report from AI Agent`
@@ -104,20 +104,19 @@ This document provides a factual, read-only comprehensive audit of the `finances
   - Changes in JustETF DOM markup or Yahoo Finance API field definitions pass the entire unit test suite undetected.
   - Acceptance Criteria: Introduce integration test fixtures with recorded cassettes or loopback HTTP servers validating real transport serialization, headers, and response formats.
 
-- [ ] **Missing Functional Live Canary for JustETF**:
+- [x] **Missing Functional Live Canary for JustETF**:
   - `scripts/yahoo_health_check.py` acts as a live canary for Yahoo Finance in CI (`yahoo_bot.yml`), but no equivalent live check exists for JustETF.
   - `.github/workflows/just_etf_bot.yml` merely runs mocked unit tests on push.
   - Acceptance Criteria: Create `scripts/just_etf_health_check.py` fetching a benchmark ETF (e.g., `IE00B4L5Y983`) against the live website, validating holdings, sectors, and TER parsing, and integrate it into `just_etf_bot.yml`.
 
 - [ ] **Decoy DOM Heuristic Vulnerabilities in Scraper Tests**:
-  - `test/test_just_etf.py` tests fallback table selectors using isolated, single-table HTML snippets.
+  - `tests/test_just_etf.py` tests fallback table selectors using isolated, single-table HTML snippets.
   - If a live JustETF page includes disclaimer tables, advertisement banners, or other non-holding tables containing the word "Holdings" prior to the actual table, heuristic parsing could bind to the wrong element.
   - Acceptance Criteria: Add integration/unit test fixtures featuring complex multi-table HTML structures with decoy tables to verify robust parser disambiguation.
 
-- [ ] **Missing Out-of-Process CLI Black-Box Tests for Automation Scripts**:
-  - None of the scripts in `scripts/` (`notify_discord.py`, `quality_eval_agent.py`, `yahoo_health_check.py`) have dedicated unit or CLI invocation tests in `tests/`.
-  - Missing coverage for CLI exit codes (`0` vs `1`), environment variable absence handling, and error output propagation.
-  - Acceptance Criteria: Add test modules (e.g., `tests/test_scripts.py`) testing script execution, parameter passing, and environment variable fallbacks via `subprocess` or runner mocks.
+- [ ] **Test Coverage for Canary and Automation Scripts (`scripts/`)**:
+  - Automation scripts (`notify_discord.py`, `quality_eval_agent.py`, `yahoo_health_check.py`, `just_etf_health_check.py`) lack isolated unit tests verifying status codes, environment fallbacks, Discord error handling, and artifact generation.
+  - Acceptance Criteria: Add `tests/test_scripts.py` exercising canary scripts with mocked HTTP responses, environment variable matrices, and failure branches.
 
 ---
 
@@ -134,13 +133,13 @@ This document provides a factual, read-only comprehensive audit of the `finances
 - [x] **CI Workflow Configuration Drift (`.github/workflows/ci.yml`)**:
   - In `finances-data/.github/workflows/ci.yml`:
     - Missing `permissions: contents: read` block.
-    - Lint and type check steps run only against `finances_data` (`ruff check finances_data`, `mypy finances_data`), ignoring `data/`, `scripts/`, and `test/`.
+    - Lint and type check steps run only against `finances_data` (`ruff check finances_data`, `mypy finances_data`), ignoring `data/`, `scripts/`, and `tests/`.
     - Missing AUDIT.md validation step (`python scripts/validate_audit_sync.py --enforce-sync`).
   - Acceptance Criteria: Update `ci.yml` to specify explicit permissions, inspect `finances_data data scripts test`, and run AUDIT synchronization checks.
 
 - [x] **Missing AUDIT Integrity & Sync Script (`scripts/validate_audit_sync.py`)**:
   - `core-lib` includes `scripts/validate_audit_sync.py` to ensure that `AUDIT.md` maintains required section headers, valid checkbox syntax, and is updated whenever monitored paths are changed.
-  - `finances-data` currently lacks this validation script and its accompanying test suite (`test/test_validate_audit_sync.py`).
+  - `finances-data` currently lacks this validation script and its accompanying test suite (`tests/test_validate_audit_sync.py`).
   - Acceptance Criteria: Introduce `scripts/validate_audit_sync.py` and unit tests in `finances-data`, configured to monitor `finances_data/`, `data/`, `scripts/`, `pyproject.toml`, and `.github/workflows/`.
 
 - [x] **`pyproject.toml` Tooling Alignment & Dependency Tightening**:
@@ -148,5 +147,10 @@ This document provides a factual, read-only comprehensive audit of the `finances
     - `name = "finances-data"` (uses hyphen), but `core_lib` is declared as `jopedro-core-lib>=0.2.0`.
     - `[tool.mypy]` specifies `files = ["finances_data", "data"]`, omitting `scripts` and `test`.
     - `[tool.ruff.lint]` select only `["E", "F", "I", "UP"]`, whereas enforcing print rules (`"T20"`) or bug detection (`"B"`) would safeguard logger standards.
-    - Test directory naming convention: `test/` is used instead of standard `tests/` used in `core-lib`.
+    - Test directory naming convention: `tests/` is used instead of standard `tests/` used in `core-lib`.
   - Acceptance Criteria: Align `pyproject.toml` tool configuration, expand mypy/ruff inspection coverage, and evaluate standardizing directory naming to `tests/`.
+
+- [ ] **Strict Type Checking on `scripts.quality_eval_agent` and Python 3.11 Version Alignment in `pyproject.toml`**:
+  - In `pyproject.toml`, `[[tool.mypy.overrides]]` currently sets `ignore_errors = true` for `scripts.quality_eval_agent`, masking type issues in that module.
+  - `requires-python` (`>=3.10`), `[tool.ruff] target-version` (`py310`), and `[tool.mypy] python_version` (`3.10`) remain at `3.10` while CI workflows run on Python `3.11`.
+  - Acceptance Criteria: Remove `ignore_errors = true` on `scripts.quality_eval_agent` once type annotations are verified, and align Python target versions in `pyproject.toml` with the `3.11` runtime environment.
