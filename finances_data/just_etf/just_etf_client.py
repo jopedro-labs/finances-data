@@ -161,7 +161,7 @@ class JustETFClient:
 
         return meta
 
-    def _extract_isin_from_element(self, element: Tag) -> str:
+    def _extract_isin_from_element(self, element: Tag | Any) -> str:
         """Extracts an ISIN code from HTML anchor hrefs or text content within a tag.
 
         Args:

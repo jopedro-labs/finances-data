@@ -6,6 +6,7 @@ import os
 import sys
 
 from core_lib.discord import DiscordNotificationError, DiscordNotifier
+from core_lib.logger import logger
 
 _MESSAGES: dict[str, str] = {
     "ok": "✅ **JustETF Tests**: All tests passed.\n🔗 {run_url}",
@@ -16,7 +17,7 @@ _MESSAGES: dict[str, str] = {
 def main() -> None:
     webhook_url = os.environ.get("INFRA_ALERTS_DISCORD_WEBHOOK")
     if not webhook_url:
-        print("INFRA_ALERTS_DISCORD_WEBHOOK not set, skipping.")
+        logger.info("INFRA_ALERTS_DISCORD_WEBHOOK not set, skipping.")
         sys.exit(0)
 
     result = os.environ.get("TEST_RESULT", "error")
@@ -28,9 +29,9 @@ def main() -> None:
     try:
         with DiscordNotifier(webhook_url=webhook_url) as notifier:
             notifier.send_message(message)
-        print(f"Discord notification sent (result={result}).")
+        logger.info(f"Discord notification sent (result={result}).")
     except DiscordNotificationError as e:
-        print(f"Discord notification failed: {e}")
+        logger.error(f"Discord notification failed: {e}")
         sys.exit(1)
 
 

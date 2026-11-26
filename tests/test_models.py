@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import pytest
 from datetime import datetime, timezone
+
+import pytest
+
 from data.models import (
-    Quotation,
-    Holding,
-    SectorExposure,
     CountryExposure,
-    ETFMarketData,
-    StockDetails,
     ETFDetails,
+    ETFMarketData,
+    Holding,
+    Quotation,
+    SectorExposure,
+    StockDetails,
     _get_float,
     _get_int,
     _get_str,
@@ -26,7 +28,9 @@ def test_holding_from_dict_validation() -> None:
     with pytest.raises(KeyError, match="missing mandatory key 'weight_pct'"):
         Holding.from_dict({"isin": "US0378331005", "name": "Apple"})
 
-    holding = Holding.from_dict({"isin": "US0378331005", "name": "Apple", "weight_pct": "5.5", "just_etf_ticker": "AAPL"})
+    holding = Holding.from_dict(
+        {"isin": "US0378331005", "name": "Apple", "weight_pct": "5.5", "just_etf_ticker": "AAPL"}
+    )
     assert holding.isin == "US0378331005"
     assert holding.name == "Apple"
     assert holding.weight_pct == 5.5
@@ -67,7 +71,9 @@ def test_dict_access_mixin() -> None:
 
 def test_quotation_to_dict() -> None:
     dt = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
-    quote = Quotation(price=150.0, currency="USD", timestamp=dt, native_price=150.0, native_currency="USD")
+    quote = Quotation(
+        price=150.0, currency="USD", timestamp=dt, native_price=150.0, native_currency="USD"
+    )
     d = quote.to_dict()
     assert d["price"] == 150.0
     assert d["currency"] == "USD"

@@ -116,9 +116,9 @@ The agent automatically executes the test suite with coverage, gathers repositor
 
 ### `just_etf_bot.yml` — Test JustETF Client
 
-Triggers on push to `finances_data/just_etf/**` or `test/test_just_etf.py`, and on `workflow_dispatch`.
+Triggers on push to `finances_data/just_etf/**` or `tests/test_just_etf.py`, and on `workflow_dispatch`.
 
-- Runs `test/test_just_etf.py` on Python 3.10
+- Runs `tests/test_just_etf.py` on Python 3.10
 - On failure: uploads test output as artifact and opens a GitHub issue
 - Always sends a Discord notification with result and run link
 

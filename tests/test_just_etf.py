@@ -8,15 +8,15 @@ import pytest
 import requests
 from bs4 import BeautifulSoup
 
-from finances_data.just_etf import JustETFClient, JustETFScrapeError
 from data.models import ETFDetails
-
+from finances_data.just_etf import JustETFClient, JustETFScrapeError
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_response(status: int, text: str = "", headers: dict | None = None) -> MagicMock:
+
+def _make_response(status: int, text: str = "", headers: dict[str, str] | None = None) -> MagicMock:
     r = MagicMock()
     r.status_code = status
     r.text = text
@@ -27,6 +27,7 @@ def _make_response(status: int, text: str = "", headers: dict | None = None) -> 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def client() -> JustETFClient:
@@ -71,6 +72,7 @@ def full_html() -> str:
 # Initialisation
 # ---------------------------------------------------------------------------
 
+
 def test_client_initialises_defaults() -> None:
     c = JustETFClient()
     assert c.timeout == 10.0
@@ -86,8 +88,11 @@ def test_client_initialises_custom_params() -> None:
 # get_etf_details — happy path
 # ---------------------------------------------------------------------------
 
+
 @patch("requests.Session.get")
-def test_get_etf_details_success(mock_get: MagicMock, client: JustETFClient, full_html: str) -> None:
+def test_get_etf_details_success(
+    mock_get: MagicMock, client: JustETFClient, full_html: str
+) -> None:
     mock_get.return_value = _make_response(200, full_html)
 
     details: ETFDetails = client.get_etf_details("IE00B3RBWM25")
@@ -123,6 +128,7 @@ def test_get_etf_details_success(mock_get: MagicMock, client: JustETFClient, ful
 # get_etf_details — HTTP / network errors
 # ---------------------------------------------------------------------------
 
+
 @patch("requests.Session.get")
 def test_get_etf_details_http_error(mock_get: MagicMock, client: JustETFClient) -> None:
     mock_get.return_value = _make_response(404)
@@ -148,9 +154,12 @@ def test_get_etf_details_request_exception(mock_get: MagicMock, client: JustETFC
 # get_etf_details — 429 rate-limit + retry
 # ---------------------------------------------------------------------------
 
+
 @patch("time.sleep", return_value=None)
 @patch("requests.Session.get")
-def test_rate_limit_retry_with_header(mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient, full_html: str) -> None:
+def test_rate_limit_retry_with_header(
+    mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient, full_html: str
+) -> None:
     mock_get.side_effect = [
         _make_response(429, headers={"Retry-After": "2"}),
         _make_response(200, full_html),
@@ -163,7 +172,9 @@ def test_rate_limit_retry_with_header(mock_get: MagicMock, mock_sleep: MagicMock
 
 @patch("time.sleep", return_value=None)
 @patch("requests.Session.get")
-def test_rate_limit_retry_without_header_defaults_60(mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient, full_html: str) -> None:
+def test_rate_limit_retry_without_header_defaults_60(
+    mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient, full_html: str
+) -> None:
     """When Retry-After header is absent the client sleeps 60 seconds."""
     mock_get.side_effect = [
         _make_response(429, headers={}),
@@ -175,7 +186,9 @@ def test_rate_limit_retry_without_header_defaults_60(mock_get: MagicMock, mock_s
 
 @patch("time.sleep", return_value=None)
 @patch("requests.Session.get")
-def test_rate_limit_then_non_200(mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient) -> None:
+def test_rate_limit_then_non_200(
+    mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient
+) -> None:
     """429 followed by another non-200 still raises JustETFScrapeError."""
     mock_get.side_effect = [
         _make_response(429, headers={"Retry-After": "1"}),
@@ -188,6 +201,7 @@ def test_rate_limit_then_non_200(mock_get: MagicMock, mock_sleep: MagicMock, cli
 # ---------------------------------------------------------------------------
 # get_etf_details — parse failure path
 # ---------------------------------------------------------------------------
+
 
 @patch("requests.Session.get")
 def test_parse_failure_wrapped(mock_get: MagicMock, client: JustETFClient) -> None:
@@ -209,6 +223,7 @@ def test_justetf_scrape_error_propagates(mock_get: MagicMock, client: JustETFCli
 # ---------------------------------------------------------------------------
 # _parse_fund_metadata
 # ---------------------------------------------------------------------------
+
 
 def _soup(html: str) -> BeautifulSoup:
     return BeautifulSoup(html, "html.parser")
@@ -255,6 +270,7 @@ def test_parse_fund_metadata_volatility_comma_decimal(client: JustETFClient) -> 
 # _parse_ter
 # ---------------------------------------------------------------------------
 
+
 def test_parse_ter_from_dom(client: JustETFClient) -> None:
     html = "<table><tr><th>TER</th><td>0.14 %</td></tr></table>"
     assert client._parse_ter(_soup(html)) == pytest.approx(0.14)
@@ -296,6 +312,7 @@ def test_parse_ter_fallback_when_dom_traversal_finds_no_number(client: JustETFCl
 # _extract_isin_from_element
 # ---------------------------------------------------------------------------
 
+
 def test_extract_isin_from_href(client: JustETFClient) -> None:
     soup = _soup('<tr><td><a href="/etf?isin=IE00B3RBWM25">Vanguard</a></td></tr>')
     row = soup.find("tr")
@@ -327,6 +344,7 @@ def test_extract_isin_returns_empty_when_no_isin(client: JustETFClient) -> None:
 # ---------------------------------------------------------------------------
 # _parse_holdings — fallback strategies
 # ---------------------------------------------------------------------------
+
 
 def test_parse_holdings_via_data_testid(client: JustETFClient, full_html: str) -> None:
     holdings = client._parse_holdings(_soup(full_html))
@@ -398,6 +416,7 @@ def test_parse_holdings_returns_empty_on_no_tables(client: JustETFClient) -> Non
 # _parse_sectors — fallback strategies
 # ---------------------------------------------------------------------------
 
+
 def test_parse_sectors_via_data_testid(client: JustETFClient, full_html: str) -> None:
     sectors = client._parse_sectors(_soup(full_html))
     assert len(sectors) == 2
@@ -452,6 +471,7 @@ def test_parse_sectors_skips_rows_without_percentage(client: JustETFClient) -> N
 # ---------------------------------------------------------------------------
 # _parse_countries — fallback strategies
 # ---------------------------------------------------------------------------
+
 
 def test_parse_countries_via_data_testid(client: JustETFClient, full_html: str) -> None:
     countries = client._parse_countries(_soup(full_html))
@@ -520,6 +540,7 @@ def test_parse_countries_skips_rows_without_percentage(client: JustETFClient) ->
 # End-to-end: empty HTML returns ETFDetails with empty lists
 # ---------------------------------------------------------------------------
 
+
 @patch("requests.Session.get")
 def test_empty_html_returns_empty_details(mock_get: MagicMock, client: JustETFClient) -> None:
     mock_get.return_value = _make_response(200, "<html><body></body></html>")
@@ -542,6 +563,7 @@ def test_empty_html_returns_empty_details(mock_get: MagicMock, client: JustETFCl
 # These tests confirm the clean-up did not regress existing behaviour.
 # ---------------------------------------------------------------------------
 
+
 def test_parse_ter_dom_value_error_falls_through_to_fallback(client: JustETFClient) -> None:
     """DOM TER label without a numeric match in its scope is skipped; next label used."""
     html = "<p>TER info only</p><p>Total Expense Ratio 0.15 %</p>"
@@ -557,6 +579,7 @@ def test_parse_ter_returns_none_when_no_ter_present(client: JustETFClient) -> No
 # ---------------------------------------------------------------------------
 # _parse_countries — COUNTRY_ALIASES normalization
 # ---------------------------------------------------------------------------
+
 
 def test_parse_countries_normalizes_usa_alias(client: JustETFClient) -> None:
     html = """

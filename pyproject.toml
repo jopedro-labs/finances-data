@@ -7,7 +7,7 @@ name = "finances-data"
 version = "0.1.0"
 description = "Finance data infrastructure clients"
 requires-python = ">=3.10"
-readme = "readme.md"
+readme = "README.md"
 dependencies = [
     "requests>=2.31",
     "beautifulsoup4>=4.12",
@@ -37,23 +37,33 @@ target-version = "py310"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP"]
+select = ["E", "F", "I", "UP", "B", "T20"]
 
 [tool.mypy]
 python_version = "3.10"
 strict = true
-files = ["finances_data", "data"]
+explicit_package_bases = true
+files = ["finances_data", "data", "scripts", "tests"]
 
 [[tool.mypy.overrides]]
 module = [
     "bs4.*",
     "yfinance.*",
+    "pandas.*",
     "core_lib.*",
+    "google.generativeai.*",
 ]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+module = [
+    "tests.test_just_etf",
+]
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
-testpaths = ["test"]
+testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "--tb=short --cov=finances_data --cov=data --cov-report=term-missing"
 
 [tool.coverage.run]
@@ -61,3 +71,9 @@ source = ["finances_data", "data"]
 
 [tool.coverage.report]
 show_missing = true
+
+[[tool.mypy.overrides]]
+module = [
+    "scripts.quality_eval_agent",
+]
+ignore_errors = true
