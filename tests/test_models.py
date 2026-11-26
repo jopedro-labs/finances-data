@@ -164,3 +164,55 @@ def test_helper_parsers() -> None:
     assert _get_str(d, "s") == "hello"
     assert _get_str(d, "missing", "default") == "default"
     assert _get_str(d, "bad_f") == "abc"
+
+
+def test_domain_range_bounds_invariants() -> None:
+    # Holding bounds
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        Holding(name="Apple", isin="US0378331005", weight_pct=-1.0)
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        Holding(name="Apple", isin="US0378331005", weight_pct=100.1)
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        Holding.from_dict({"name": "Apple", "isin": "US0378331005", "weight_pct": -5.0})
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        Holding.from_dict({"name": "Apple", "isin": "US0378331005", "weight_pct": 105.0})
+    with pytest.raises(ValueError, match="valid float"):
+        Holding.from_dict({"name": "Apple", "isin": "US0378331005", "weight_pct": "invalid"})
+
+    # SectorExposure bounds
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        SectorExposure(sector_name="Tech", weight_pct=-0.5)
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        SectorExposure(sector_name="Tech", weight_pct=105.0)
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        SectorExposure.from_dict({"sector_name": "Tech", "weight_pct": -5.0})
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        SectorExposure.from_dict({"sector_name": "Tech", "weight_pct": 150.0})
+    with pytest.raises(ValueError, match="valid float"):
+        SectorExposure.from_dict({"sector_name": "Tech", "weight_pct": "invalid"})
+
+    # CountryExposure bounds
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        CountryExposure(country_name="USA", weight_pct=-0.1)
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        CountryExposure(country_name="USA", weight_pct=100.5)
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        CountryExposure.from_dict({"country_name": "USA", "weight_pct": -1.0})
+    with pytest.raises(ValueError, match="between 0.0 and 100.0"):
+        CountryExposure.from_dict({"country_name": "USA", "weight_pct": 101.0})
+    with pytest.raises(ValueError, match="valid float"):
+        CountryExposure.from_dict({"country_name": "USA", "weight_pct": "invalid"})
+
+    # Quotation bounds
+    with pytest.raises(ValueError, match="must be non-negative"):
+        Quotation(price=-10.0, currency="USD")
+    with pytest.raises(ValueError, match="native_price must be non-negative"):
+        Quotation(price=10.0, currency="USD", native_price=-5.0)
+
+    # ETFMarketData bounds
+    with pytest.raises(ValueError, match="price must be non-negative"):
+        ETFMarketData(price=-1.0)
+    with pytest.raises(ValueError, match="nav_price must be non-negative"):
+        ETFMarketData(nav_price=-10.0)
+    with pytest.raises(ValueError, match="average_volume must be non-negative"):
+        ETFMarketData(average_volume=-50)

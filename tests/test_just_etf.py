@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -172,16 +173,16 @@ def test_rate_limit_retry_with_header(
 
 @patch("time.sleep", return_value=None)
 @patch("requests.Session.get")
-def test_rate_limit_retry_without_header_defaults_60(
+def test_rate_limit_retry_without_header_defaults(
     mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient, full_html: str
 ) -> None:
-    """When Retry-After header is absent the client sleeps 60 seconds."""
+    """When Retry-After header is absent the client defaults to 1.0s backoff."""
     mock_get.side_effect = [
         _make_response(429, headers={}),
         _make_response(200, full_html),
     ]
     client.get_etf_details("IE00B3RBWM25")
-    mock_sleep.assert_called_once_with(60)
+    mock_sleep.assert_called_once_with(1.0)
 
 
 @patch("time.sleep", return_value=None)
@@ -606,3 +607,86 @@ def test_parse_countries_unmapped_name_retained(client: JustETFClient) -> None:
     countries = client._parse_countries(_soup(html))
     assert len(countries) == 1
     assert countries[0].country_name == "Switzerland"
+
+
+# ---------------------------------------------------------------------------
+# Retry-After parsing and 429 bounded loop tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_retry_after_integer_seconds(client: JustETFClient) -> None:
+    assert client._parse_retry_after("5") == 5.0
+    assert client._parse_retry_after("0") == 0.0
+
+
+def test_parse_retry_after_caps_at_maximum(client: JustETFClient) -> None:
+    assert client._parse_retry_after("60") == 10.0
+    assert client._parse_retry_after("3600") == 10.0
+
+
+def test_parse_retry_after_negative_clamped_to_zero(client: JustETFClient) -> None:
+    assert client._parse_retry_after("-5") == 0.0
+
+
+def test_parse_retry_after_none_or_empty(client: JustETFClient) -> None:
+    assert client._parse_retry_after(None) == 1.0
+    assert client._parse_retry_after("") == 1.0
+
+
+def test_parse_retry_after_http_date(client: JustETFClient) -> None:
+    import email.utils
+    from datetime import datetime, timezone
+    future_date = email.utils.format_datetime(
+        datetime.now(timezone.utc).replace(microsecond=0)
+    )
+    delay = client._parse_retry_after(future_date)
+    assert 0.0 <= delay <= 10.0
+
+
+def test_parse_retry_after_http_date_naive(client: JustETFClient) -> None:
+    naive_date_str = "Wed, 21 Oct 2099 07:28:00"
+    delay = client._parse_retry_after(naive_date_str)
+    assert delay == 10.0
+
+
+def test_parse_retry_after_invalid_header_defaults_with_warning(client: JustETFClient) -> None:
+    delay = client._parse_retry_after("invalid-date-or-number")
+    assert delay == 1.0
+
+
+@patch("time.sleep", return_value=None)
+@patch("requests.Session.get")
+def test_rate_limit_exceeds_max_retries_raises_scrape_error(
+    mock_get: MagicMock, mock_sleep: MagicMock, client: JustETFClient
+) -> None:
+    client.max_retries = 2
+    mock_get.side_effect = [
+        _make_response(429, headers={"Retry-After": "1"}),
+        _make_response(429, headers={"Retry-After": "1"}),
+    ]
+    with pytest.raises(JustETFScrapeError, match="HTTP error 429"):
+        client.get_etf_details("IE00B3RBWM25")
+    assert mock_get.call_count == 2
+    mock_sleep.assert_called_once_with(1.0)
+
+
+# ---------------------------------------------------------------------------
+# Metadata parsing ValueError logging checks
+# ---------------------------------------------------------------------------
+
+
+def test_parse_fund_metadata_value_errors_logged(client: JustETFClient) -> None:
+    with patch("re.search") as mock_search:
+        mock_match = MagicMock()
+        mock_match.group.return_value = "not-a-number"
+
+        def search_side_effect(pattern: str, text: str, *args: Any, **kwargs: Any) -> Any:
+            if "Fund size" in pattern or "Holdings" in pattern or "Volatility 1 year" in pattern:
+                return mock_match
+            return None
+
+        mock_search.side_effect = search_side_effect
+        meta = client._parse_fund_metadata(_soup("dummy text"))
+        assert "fund_size_eur_m" not in meta
+        assert "holdings_count" not in meta
+        assert "volatility_1y_pct" not in meta
