@@ -37,7 +37,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
 
 ## 2. Bugs & Code Fragilities
 
-- [ ] **Violation of Logging Standard — Ad-hoc `print()` and Unconfigured Logging in `scripts/`**:
+- [x] **Violation of Logging Standard — Ad-hoc `print()` and Unconfigured Logging in `scripts/`**:
   - `finances-data` completely bypasses `core_lib.logger` across its scripts, relying on raw `print()` statements:
     - `scripts/notify_discord.py`: Lines 19, 31, 33 use `print()`.
     - `scripts/yahoo_health_check.py`: Lines 24, 36, 42, 48, 54 use `print()`.
@@ -51,7 +51,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
   - In `core-lib`, `scripts/quality_eval_agent.py` and `pyproject.toml` were modernized to the official Google GenAI SDK (`from google import genai`) with `"google-genai>=0.1.1"` and default model `"gemini-2.5-flash"`.
   - Acceptance Criteria: Migrate `scripts/quality_eval_agent.py` to `google-genai`, update `pyproject.toml` dependencies, and align default `GEMINI_MODEL` with `core-lib`.
 
-- [ ] **Hardcoded Rate-Limit Sleep & Timeout Fragility in `JustETFClient`**:
+- [x] **Hardcoded Rate-Limit Sleep & Timeout Fragility in `JustETFClient`**:
   - In `finances_data/just_etf/just_etf_client.py` (lines 75-78):
     ```python
     if response.status_code == 429:
@@ -64,7 +64,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
     Furthermore, non-numeric `Retry-After` headers (e.g., HTTP date format `Wed, 21 Oct 2026 07:28:00 GMT`) will trigger an unhandled `ValueError` when calling `int(...)`.
   - Acceptance Criteria: Add safe parsing for `Retry-After` (handling non-numeric/date formats and capping maximum sleep backoff to e.g. 10s) and incorporate retry attempts within a bounded loop.
 
-- [ ] **Unhandled Exceptions & Missing Validation in Metadata Conversion**:
+- [x] **Unhandled Exceptions & Missing Validation in Metadata Conversion**:
   - In `finances_data/just_etf/just_etf_client.py` (lines 144-159):
     `_parse_fund_metadata()` relies on `with contextlib.suppress(ValueError):` for `fund_size_eur_m`, `holdings_count`, and `volatility_1y_pct`.
     If parsing fails due to unexpected formatting, fields silently default to `None` with zero diagnostic logging, masking upstream DOM structure changes.
@@ -72,14 +72,14 @@ This document provides a factual, read-only comprehensive audit of the `finances
     `latest_row: Any = history.iloc[-1]` assumes history is non-empty after checking `if history.empty:`. However, if history returns columns with `NaN` or unaligned dates, `price` is returned as `None` or raises `YahooFinanceError("Invalid or missing close price...")` without capturing underlying ticker currency context.
   - Acceptance Criteria: Add explicit debug/warning logs via `core_lib.logger` when fallback suppressions occur, and enrich exception messages with ticker metadata.
 
-- [ ] **Broad `Any` Typing and Pandas Type Erasure in Yahoo Finance Client**:
+- [x] **Broad `Any` Typing and Pandas Type Erasure in Yahoo Finance Client**:
   - In `finances_data/yahoo_finance/yahoo_finance_client.py`:
     `t.info` and `t.history(period="1d")` return untyped `Any` structures (`history: Any`, `latest_row: Any`, `info: dict[str, Any]`).
     `info.get(...)` accesses are repeated without typed dictionary contracts or data schema wrappers.
   - In `pyproject.toml`, `[[tool.mypy.overrides]]` disables type checking for `yfinance.*` and `bs4.*` with `ignore_missing_imports = true`, leaving data transformations weakly checked.
   - Acceptance Criteria: Introduce structural typing protocols or `TypedDict` representations for `yfinance` response payloads, eliminating untyped attribute access.
 
-- [ ] **Missing Domain Range Bounds on Financial Data Models**:
+- [x] **Missing Domain Range Bounds on Financial Data Models**:
   - In `data/models.py`:
     `Holding`, `SectorExposure`, and `CountryExposure` accept negative weights or weights exceeding 100% (e.g., `Holding(weight_pct=-15.0)` or `SectorExposure(weight_pct=150.0)`).
     `Quotation` and `ETFMarketData` accept negative prices or volume figures without validation.
@@ -89,10 +89,10 @@ This document provides a factual, read-only comprehensive audit of the `finances
   - `TODO.md` specified:
     - `workflows should run on Thursdays`
     - `**Item 3:** Analyze quality report from AI Agent`
-    - `criar um guia para o Claude AGENT`
+    - `criar guia de desenvolvimento e portas de qualidade para agentes de automação`
   - In `finances-data/.github/workflows/yahoo_bot.yml`, the cron is currently set to Mondays (`cron: '0 8 * * 1'`).
   - `.github/workflows/just_etf_bot.yml` has no `schedule` trigger configured at all (only `push` on paths and `workflow_dispatch`).
-  - Acceptance Criteria: Update `yahoo_bot.yml` and add scheduled execution to `just_etf_bot.yml` on Thursdays (`0 8 * * 4`). Consolidate the findings from `reports/validation_gap_report.md` into backlog tasks, and document guidelines for Claude Agent execution.
+  - Acceptance Criteria: Update `yahoo_bot.yml` and add scheduled execution to `just_etf_bot.yml` on Thursdays (`0 8 * * 4`). Consolidate the findings from `reports/validation_gap_report.md` into backlog tasks, and document guidelines for automation agent execution.
 
 ---
 

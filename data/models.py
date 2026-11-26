@@ -57,6 +57,14 @@ class Quotation(DictAccessMixin):
     native_price: float | None = None
     native_currency: str | None = None
 
+    def __post_init__(self) -> None:
+        if self.price < 0.0:
+            raise ValueError(f"[models] Quotation price must be non-negative, got {self.price}")
+        if self.native_price is not None and self.native_price < 0.0:
+            raise ValueError(
+                f"[models] Quotation native_price must be non-negative, got {self.native_price}"
+            )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "price": self.price,
@@ -76,6 +84,12 @@ class Holding(DictAccessMixin):
     weight_pct: float
     just_etf_ticker: str | None = None
 
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.weight_pct <= 100.0):
+            raise ValueError(
+                f"[models] Holding weight_pct must be between 0.0 and 100.0, got {self.weight_pct}"
+            )
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Holding:
         if not data.get("isin"):
@@ -85,10 +99,18 @@ class Holding(DictAccessMixin):
         if "weight_pct" not in data:
             raise KeyError("[models] Holding missing mandatory key 'weight_pct'.")
 
+        raw_weight = _get_float(data, "weight_pct")
+        if raw_weight is None:
+            raise ValueError("[models] Holding weight_pct must be a valid float.")
+        if not (0.0 <= raw_weight <= 100.0):
+            raise ValueError(
+                f"[models] Holding weight_pct must be between 0.0 and 100.0, got {raw_weight}"
+            )
+
         return cls(
             name=str(data["name"]),
             isin=str(data["isin"]),
-            weight_pct=_get_float(data, "weight_pct", 0.0) or 0.0,
+            weight_pct=raw_weight,
             just_etf_ticker=_get_str(data, "just_etf_ticker") or _get_str(data, "just_etf"),
         )
 
@@ -103,6 +125,13 @@ class SectorExposure(DictAccessMixin):
     sector_name: str
     weight_pct: float
 
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.weight_pct <= 100.0):
+            raise ValueError(
+                f"[models] SectorExposure weight_pct must be between 0.0 and 100.0, "
+                f"got {self.weight_pct}"
+            )
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SectorExposure:
         if not data.get("sector_name"):
@@ -110,9 +139,18 @@ class SectorExposure(DictAccessMixin):
         if "weight_pct" not in data:
             raise KeyError("[models] Sector exposure missing mandatory key 'weight_pct'.")
 
+        raw_weight = _get_float(data, "weight_pct")
+        if raw_weight is None:
+            raise ValueError("[models] SectorExposure weight_pct must be a valid float.")
+        if not (0.0 <= raw_weight <= 100.0):
+            raise ValueError(
+                f"[models] SectorExposure weight_pct must be between 0.0 and 100.0, "
+                f"got {raw_weight}"
+            )
+
         return cls(
             sector_name=str(data["sector_name"]),
-            weight_pct=_get_float(data, "weight_pct", 0.0) or 0.0,
+            weight_pct=raw_weight,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -126,6 +164,13 @@ class CountryExposure(DictAccessMixin):
     country_name: str
     weight_pct: float
 
+    def __post_init__(self) -> None:
+        if not (0.0 <= self.weight_pct <= 100.0):
+            raise ValueError(
+                f"[models] CountryExposure weight_pct must be between 0.0 and 100.0, "
+                f"got {self.weight_pct}"
+            )
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CountryExposure:
         if not data.get("country_name"):
@@ -133,11 +178,20 @@ class CountryExposure(DictAccessMixin):
         if "weight_pct" not in data:
             raise KeyError("[models] Country exposure missing mandatory key 'weight_pct'.")
 
+        raw_weight = _get_float(data, "weight_pct")
+        if raw_weight is None:
+            raise ValueError("[models] CountryExposure weight_pct must be a valid float.")
+        if not (0.0 <= raw_weight <= 100.0):
+            raise ValueError(
+                f"[models] CountryExposure weight_pct must be between 0.0 and 100.0, "
+                f"got {raw_weight}"
+            )
+
         raw_name: str = str(data["country_name"]).strip()
 
         return cls(
             country_name=raw_name,
-            weight_pct=_get_float(data, "weight_pct", 0.0) or 0.0,
+            weight_pct=raw_weight,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -158,6 +212,19 @@ class ETFMarketData(DictAccessMixin):
     fifty_day_average: float | None = None
     two_hundred_day_average: float | None = None
     average_volume: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.price is not None and self.price < 0.0:
+            raise ValueError(f"[models] ETFMarketData price must be non-negative, got {self.price}")
+        if self.nav_price is not None and self.nav_price < 0.0:
+            raise ValueError(
+                f"[models] ETFMarketData nav_price must be non-negative, got {self.nav_price}"
+            )
+        if self.average_volume is not None and self.average_volume < 0:
+            raise ValueError(
+                f"[models] ETFMarketData average_volume must be non-negative, "
+                f"got {self.average_volume}"
+            )
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ETFMarketData:

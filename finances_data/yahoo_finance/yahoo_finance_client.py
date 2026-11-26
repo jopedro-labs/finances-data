@@ -2,12 +2,68 @@
 
 from __future__ import annotations
 
+import math
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypedDict, cast
 
+import pandas as pd
 import yfinance as yf
+from core_lib.logger import logger
 
 from data.models import ETFMarketData, Quotation, StockDetails
+
+
+class YahooTickerInfo(TypedDict, total=False):
+    """Typed dictionary schema representing fields extracted from yfinance.Ticker.info."""
+
+    currency: str
+    financialCurrency: str
+    marketCap: float | int
+    trailingPE: float
+    forwardPE: float
+    dividendYield: float
+    fiftyTwoWeekHigh: float
+    fiftyTwoWeekLow: float
+    fiftyTwoWeekChangePercent: float
+    fiftyDayAverage: float
+    twoHundredDayAverage: float
+    averageVolume: int
+    sector: str
+    industry: str
+    country: str
+    priceToBook: float
+    pegRatio: float
+    beta: float
+    profitMargins: float
+    grossMargins: float
+    operatingMargins: float
+    revenueGrowth: float
+    earningsGrowth: float
+    returnOnEquity: float
+    returnOnAssets: float
+    debtToEquity: float
+    freeCashflow: float | int
+    shortRatio: float
+    targetMeanPrice: float
+    targetHighPrice: float
+    targetLowPrice: float
+    numberOfAnalystOpinions: int
+    recommendationKey: str
+    trailingEps: float
+    forwardEps: float
+    navPrice: float
+
+
+class YahooHistoryRow(TypedDict, total=False):
+    """Typed dictionary schema representing a single historical quotation row."""
+
+    Open: float
+    High: float
+    Low: float
+    Close: float
+    Volume: int
+    Dividends: float
+    StockSplits: float
 
 
 class YahooFinanceError(Exception):
@@ -22,30 +78,72 @@ class YahooFinanceClient:
     def __init__(self) -> None:
         pass
 
-    def _fetch_ticker_market_data(self, ticker: str) -> tuple[float, str, dict[str, Any]]:
+    def _extract_ticker_info(self, t: yf.Ticker, ticker: str) -> YahooTickerInfo:
+        """Extract and safely wrap yfinance.Ticker.info dictionary."""
+        try:
+            raw_info: Any = t.info
+        except Exception as e:
+            raise YahooFinanceError(
+                f"Failed to retrieve info for ticker '{ticker}': {e}"
+            ) from e
+
+        if isinstance(raw_info, dict):
+            return cast(YahooTickerInfo, raw_info)
+
+        logger.warning(
+            f"Ticker '{ticker}' returned non-dict info payload: {type(raw_info)}"
+        )
+        return cast(YahooTickerInfo, raw_info)
+
+    def _extract_history_row(self, history: pd.DataFrame, ticker: str) -> YahooHistoryRow:
+        """Validate and extract the latest historical row from yfinance DataFrame."""
+        if not isinstance(history, pd.DataFrame) or history.empty:
+            raise YahooFinanceError(f"No price history returned for ticker '{ticker}'.")
+
+        row_series = history.iloc[-1]
+        row_dict: dict[str, Any] = row_series.to_dict()
+        return cast(YahooHistoryRow, row_dict)
+
+    def _fetch_ticker_market_data(self, ticker: str) -> tuple[float, str, YahooTickerInfo]:
         """Helper to fetch info, history, price, and currency for a ticker efficiently."""
         try:
             t: yf.Ticker = yf.Ticker(ticker)
-            try:
-                info: dict[str, Any] = t.info
-            except Exception as e:
-                raise YahooFinanceError(
-                    f"Failed to retrieve info for ticker '{ticker}': {e}"
-                ) from e
+            info: YahooTickerInfo = self._extract_ticker_info(t, ticker)
 
-            history: Any = t.history(period="1d")
-            if history.empty:
-                raise YahooFinanceError(f"No price history returned for ticker '{ticker}'.")
+            history: pd.DataFrame = t.history(period="1d")
+            latest_row: YahooHistoryRow = self._extract_history_row(history, ticker)
 
-            latest_row: Any = history.iloc[-1]
-            price: float | None = _safe_float(latest_row.get("Close"))
+            raw_close = latest_row.get("Close")
+            price: float | None = _safe_float(raw_close)
             if price is None:
-                raise YahooFinanceError(f"Invalid or missing close price for ticker '{ticker}'.")
+                logger.error(
+                    f"Invalid or missing close price for ticker '{ticker}'. "
+                    f"Raw close value: {raw_close}"
+                )
+                raise YahooFinanceError(
+                    f"Invalid or missing close price for ticker '{ticker}'."
+                )
 
             currency_str: Any = info.get("currency")
             if not currency_str:
-                raise YahooFinanceError(f"Currency information is missing for ticker '{ticker}'.")
-            currency: str = str(currency_str).upper()
+                logger.error(
+                    f"Currency information is missing for ticker '{ticker}'. "
+                    f"Available keys: {list(info.keys())}"
+                )
+                raise YahooFinanceError(
+                    f"Currency information is missing for ticker '{ticker}'."
+                )
+            currency: str = str(currency_str).strip().upper()
+
+            fin_currency: Any = info.get("financialCurrency")
+            if fin_currency:
+                fin_curr_norm: str = str(fin_currency).strip().upper()
+                if fin_curr_norm != currency:
+                    logger.warning(
+                        f"Currency mismatch detected for ticker '{ticker}': "
+                        f"trading currency is '{currency}' while financial currency "
+                        f"is '{fin_curr_norm}'."
+                    )
 
             return price, currency, info
         except YahooFinanceError:
@@ -72,13 +170,7 @@ class YahooFinanceClient:
         """Fetches fundamental metrics and valuation ratios for a stock ticker."""
         try:
             t: yf.Ticker = yf.Ticker(ticker)
-            info: dict[str, Any]
-            try:
-                info = t.info
-            except Exception as e:
-                raise YahooFinanceError(
-                    f"Failed to retrieve info for ticker '{ticker}': {e}"
-                ) from e
+            info: YahooTickerInfo = self._extract_ticker_info(t, ticker)
 
             change_52w: Any = info.get("52WeekChange")
             if change_52w is None:
@@ -131,7 +223,7 @@ class YahooFinanceClient:
         """Fetches market pricing and moving averages for an ETF ticker efficiently."""
         price: float
         currency: str
-        info: dict[str, Any]
+        info: YahooTickerInfo
         price, currency, info = self._fetch_ticker_market_data(ticker)
 
         change_52w: Any = info.get("52WeekChange")
@@ -156,7 +248,10 @@ def _safe_float(val: Any, scale: float = 1.0) -> float | None:
     if val is None or val == "":
         return None
     try:
-        return float(val) * scale
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return f * scale
     except (ValueError, TypeError):
         return None
 
@@ -165,7 +260,10 @@ def _safe_int(val: Any) -> int | None:
     if val is None or val == "":
         return None
     try:
-        return int(val)
+        f = float(val)
+        if math.isnan(f) or math.isinf(f):
+            return None
+        return int(f)
     except (ValueError, TypeError):
         return None
 
@@ -173,4 +271,7 @@ def _safe_int(val: Any) -> int | None:
 def _safe_str(val: Any) -> str | None:
     if val is None or val == "":
         return None
-    return str(val).strip() or None
+    val_str = str(val).strip()
+    if not val_str or val_str.lower() in ("nan", "none", "null"):
+        return None
+    return val_str

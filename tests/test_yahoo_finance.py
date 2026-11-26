@@ -262,13 +262,56 @@ def test_safe_float_helpers() -> None:
     assert _safe_float("") is None
     assert _safe_float("2.5") == pytest.approx(2.5)
     assert _safe_float("2.5", scale=100.0) == pytest.approx(250.0)
+    assert _safe_float(float("nan")) is None
+    assert _safe_float(float("inf")) is None
 
     assert _safe_int("not_an_int") is None
     assert _safe_int("") is None
     assert _safe_int(None) is None
     assert _safe_int("42") == 42
+    assert _safe_int(float("nan")) is None
+    assert _safe_int(float("inf")) is None
 
     assert _safe_str("   ") is None
     assert _safe_str("") is None
     assert _safe_str(None) is None
+    assert _safe_str("nan") is None
+    assert _safe_str("None") is None
+    assert _safe_str("null") is None
     assert _safe_str("  hello  ") == "hello"
+
+
+@patch("yfinance.Ticker")
+def test_currency_mismatch_warning_logged(mock_ticker: MagicMock) -> None:
+    instance = MagicMock()
+    instance.info = {"currency": "EUR", "financialCurrency": "USD"}
+    instance.history.return_value = pd.DataFrame([{"Close": 100.0}])
+    mock_ticker.return_value = instance
+
+    client = YahooFinanceClient()
+    quote = client.get_quotation("VWCE.DE")
+    assert quote.currency == "EUR"
+
+
+@patch("yfinance.Ticker")
+def test_history_with_nan_close_raises_error(mock_ticker: MagicMock) -> None:
+    instance = MagicMock()
+    instance.info = {"currency": "USD"}
+    instance.history.return_value = pd.DataFrame([{"Close": float("nan")}])
+    mock_ticker.return_value = instance
+
+    client = YahooFinanceClient()
+    with pytest.raises(YahooFinanceError, match="Invalid or missing close price"):
+        client.get_quotation("AAPL")
+
+
+@patch("yfinance.Ticker")
+def test_extract_history_row_non_dataframe_raises_error(mock_ticker: MagicMock) -> None:
+    instance = MagicMock()
+    instance.info = {"currency": "USD"}
+    instance.history.return_value = "not a dataframe"
+    mock_ticker.return_value = instance
+
+    client = YahooFinanceClient()
+    with pytest.raises(YahooFinanceError, match="No price history returned"):
+        client.get_quotation("AAPL")

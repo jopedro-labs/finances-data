@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-import contextlib
+import email.utils
 import re
 import time
+from datetime import datetime, timezone
 from typing import Any
 
 import requests
 from bs4 import BeautifulSoup, Tag
+from core_lib.logger import logger
 from requests.adapters import HTTPAdapter
 from urllib3.util import Retry
 
@@ -36,6 +38,8 @@ class JustETFClient:
         ),
         "Accept-Language": "en-US,en;q=0.9",
     }
+    MAX_RETRY_AFTER_SECONDS: float = 10.0
+    DEFAULT_RETRY_AFTER_SECONDS: float = 1.0
 
     def __init__(self, timeout: float = 10.0, max_retries: int = 3) -> None:
         """Initializes the JustETF client with configurable timeout and retry adapters.
@@ -45,6 +49,7 @@ class JustETFClient:
             max_retries: Maximum number of connection retries for transient errors.
         """
         self.timeout: float = timeout
+        self.max_retries: int = max_retries
         self.session: requests.Session = requests.Session()
         self.session.headers.update(self.DEFAULT_HEADERS)
 
@@ -57,6 +62,35 @@ class JustETFClient:
         adapter: HTTPAdapter = HTTPAdapter(max_retries=retries)
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
+
+    def _parse_retry_after(self, retry_after_header: str | None) -> float:
+        """Parse Retry-After header safely, supporting integer seconds or HTTP-date.
+
+        Capped at MAX_RETRY_AFTER_SECONDS and clamped to non-negative floats.
+        """
+        if not retry_after_header:
+            return self.DEFAULT_RETRY_AFTER_SECONDS
+
+        cleaned_header: str = retry_after_header.strip()
+        try:
+            seconds = float(cleaned_header)
+            return min(max(0.0, seconds), self.MAX_RETRY_AFTER_SECONDS)
+        except ValueError:
+            pass
+
+        try:
+            target_dt: datetime = email.utils.parsedate_to_datetime(cleaned_header)
+            now_dt: datetime = datetime.now(timezone.utc)
+            if target_dt.tzinfo is None:
+                target_dt = target_dt.replace(tzinfo=timezone.utc)
+            delta: float = (target_dt - now_dt).total_seconds()
+            return min(max(0.0, delta), self.MAX_RETRY_AFTER_SECONDS)
+        except Exception as e:
+            logger.warning(
+                f"Failed to parse Retry-After header value '{retry_after_header}': {e}. "
+                f"Defaulting to {self.DEFAULT_RETRY_AFTER_SECONDS}s backoff."
+            )
+            return self.DEFAULT_RETRY_AFTER_SECONDS
 
     def get_etf_details(self, isin: str) -> ETFDetails:
         """Fetches and parses comprehensive ETF details for a given ISIN from JustETF.
@@ -71,18 +105,42 @@ class JustETFClient:
             JustETFScrapeError: If network requests fail or parsing encounters an error.
         """
         url: str = f"{self.BASE_URL}?isin={isin}"
-        try:
-            response: requests.Response = self.session.get(url, timeout=self.timeout)
-            if response.status_code == 429:
-                retry_after: int = int(response.headers.get("Retry-After", 60))
-                time.sleep(retry_after)
+        response: requests.Response | None = None
+        attempts: int = 0
+        max_attempts: int = max(1, self.max_retries)
+
+        while attempts < max_attempts:
+            attempts += 1
+            try:
                 response = self.session.get(url, timeout=self.timeout)
-            if response.status_code != 200:
+            except requests.RequestException as e:
                 raise JustETFScrapeError(
-                    f"HTTP error {response.status_code} while fetching ISIN {isin}"
+                    f"Network error fetching JustETF page for {isin}: {e}"
+                ) from e
+
+            if response.status_code == 429:
+                if attempts >= max_attempts:
+                    logger.warning(
+                        f"Rate limit exceeded (HTTP 429) for ISIN {isin} after {attempts} attempts."
+                    )
+                    break
+                sleep_seconds: float = self._parse_retry_after(
+                    response.headers.get("Retry-After")
                 )
-        except requests.RequestException as e:
-            raise JustETFScrapeError(f"Network error fetching JustETF page for {isin}: {e}") from e
+                logger.warning(
+                    f"Rate limited (HTTP 429) fetching ISIN {isin}. "
+                    f"Sleeping for {sleep_seconds:.1f}s before retry ({attempts}/{max_attempts})."
+                )
+                time.sleep(sleep_seconds)
+                continue
+
+            break
+
+        if response is None or response.status_code != 200:
+            status = response.status_code if response is not None else "unknown"
+            raise JustETFScrapeError(
+                f"HTTP error {status} while fetching ISIN {isin}"
+            )
 
         try:
             soup: BeautifulSoup = BeautifulSoup(response.text, "html.parser")
@@ -142,22 +200,37 @@ class JustETFClient:
 
         fs_match: re.Match[str] | None = re.search(r"Fund size\s*\n?EUR\s*([\d,]+)\s*m", text)
         if fs_match:
-            with contextlib.suppress(ValueError):
-                meta["fund_size_eur_m"] = float(fs_match.group(1).replace(",", ""))
+            raw_fs = fs_match.group(1).replace(",", "")
+            try:
+                meta["fund_size_eur_m"] = float(raw_fs)
+            except ValueError as e:
+                logger.warning(
+                    f"Failed to parse 'fund_size_eur_m' with raw value '{raw_fs}': {e}"
+                )
 
         hc_match: re.Match[str] | None = re.search(r"Holdings\s*\n([\d,]+)", text)
         if not hc_match:
             hc_match = re.search(r"out of ([\d,]+)", text)
         if hc_match:
-            with contextlib.suppress(ValueError):
-                meta["holdings_count"] = int(hc_match.group(1).replace(",", ""))
+            raw_hc = hc_match.group(1).replace(",", "")
+            try:
+                meta["holdings_count"] = int(raw_hc)
+            except ValueError as e:
+                logger.warning(
+                    f"Failed to parse 'holdings_count' with raw value '{raw_hc}': {e}"
+                )
 
         vol_match: re.Match[str] | None = re.search(
             r"Volatility 1 year[^\n]*\n?([\d.,]+)\s*%", text
         )
         if vol_match:
-            with contextlib.suppress(ValueError):
-                meta["volatility_1y_pct"] = float(vol_match.group(1).replace(",", "."))
+            raw_vol = vol_match.group(1).replace(",", ".")
+            try:
+                meta["volatility_1y_pct"] = float(raw_vol)
+            except ValueError as e:
+                logger.warning(
+                    f"Failed to parse 'volatility_1y_pct' with raw value '{raw_vol}': {e}"
+                )
 
         return meta
 
