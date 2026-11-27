@@ -1,6 +1,6 @@
 # finances-data
 
-![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)
+![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Version](https://img.shields.io/badge/version-0.1.0-58a6ff?style=flat-square)
 ![Monitor JustETF Scraper](https://github.com/jopedro-labs/finances-data/actions/workflows/just_etf_bot.yml/badge.svg)
 ![Monitor Yahoo Finance API](https://github.com/jopedro-labs/finances-data/actions/workflows/yahoo_bot.yml/badge.svg)

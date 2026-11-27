@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 import traceback
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from core_lib.discord import DiscordNotificationError, DiscordNotifier
@@ -26,7 +26,7 @@ def _write_github_output(result: str) -> None:
 
 def _write_error_log(error_message: str, exc: BaseException | None = None) -> None:
     LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    timestamp: str = datetime.now(timezone.utc).isoformat()
+    timestamp: str = datetime.now(UTC).isoformat()
     log_entry: str = f"[{timestamp}] ERROR: {error_message}\n"
     if exc is not None:
         tb: str = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))

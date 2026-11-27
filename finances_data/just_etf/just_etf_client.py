@@ -5,7 +5,7 @@ from __future__ import annotations
 import email.utils
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import requests
@@ -80,9 +80,9 @@ class JustETFClient:
 
         try:
             target_dt: datetime = email.utils.parsedate_to_datetime(cleaned_header)
-            now_dt: datetime = datetime.now(timezone.utc)
+            now_dt: datetime = datetime.now(UTC)
             if target_dt.tzinfo is None:
-                target_dt = target_dt.replace(tzinfo=timezone.utc)
+                target_dt = target_dt.replace(tzinfo=UTC)
             delta: float = (target_dt - now_dt).total_seconds()
             return min(max(0.0, delta), self.MAX_RETRY_AFTER_SECONDS)
         except Exception as e:
@@ -263,37 +263,16 @@ class JustETFClient:
 
         return ""
 
-    def _parse_holdings(self, soup: BeautifulSoup) -> list[Holding]:
-        """Parses the top holdings table from the ETF profile page.
+    def _extract_holdings_from_rows(self, rows: list[Tag]) -> list[Holding]:
+        """Extracts Holding domain objects from HTML table row elements.
 
         Args:
-            soup: Parsed BeautifulSoup object of the ETF profile page.
+            rows: List of BeautifulSoup Tag elements representing table rows.
 
         Returns:
-            A list of Holding domain objects.
+            List of parsed Holding objects with valid ISINs and weight percentages.
         """
         holdings: list[Holding] = []
-        rows: list[Tag] = soup.find_all(
-            "tr", {"data-testid": lambda x: bool(x and "top-holdings_row" in str(x))}
-        )
-
-        if not rows:
-            container_res: Any = soup.find("table", {"id": "top-holdings"})
-            container: Tag | None = container_res if isinstance(container_res, Tag) else None
-            if isinstance(container, Tag):
-                rows = container.find_all("tr")
-
-        if not rows:
-            for table in soup.find_all("table"):
-                header_text: str = table.get_text().lower()
-                if (
-                    ("top holdings" in header_text or "holding" in header_text)
-                    and "sector" not in header_text
-                    and "country" not in header_text
-                ):
-                    rows = table.find_all("tr")
-                    break
-
         for row in rows:
             cols: list[Tag] = row.find_all(["td", "th"])
             if len(cols) >= 2:
@@ -322,40 +301,60 @@ class JustETFClient:
                             just_etf_ticker=None,
                         )
                     )
-
         return holdings
 
-    def _parse_sectors(self, soup: BeautifulSoup) -> list[SectorExposure]:
-        """Parses the sector breakdown table from the ETF profile page.
+    def _parse_holdings(self, soup: BeautifulSoup) -> list[Holding]:
+        """Parses the top holdings table from the ETF profile page.
 
         Args:
             soup: Parsed BeautifulSoup object of the ETF profile page.
 
         Returns:
-            A list of SectorExposure domain objects.
+            A list of Holding domain objects.
+        """
+        # Tier 1: Look for data-testid rows
+        rows: list[Tag] = soup.find_all(
+            "tr", {"data-testid": lambda x: bool(x and "top-holdings_row" in str(x))}
+        )
+        if rows:
+            holdings: list[Holding] = self._extract_holdings_from_rows(rows)
+            if holdings:
+                return holdings
+
+        # Tier 2: Look for table with id="top-holdings"
+        container_res: Any = soup.find("table", {"id": "top-holdings"})
+        container: Tag | None = container_res if isinstance(container_res, Tag) else None
+        if isinstance(container, Tag):
+            holdings = self._extract_holdings_from_rows(container.find_all("tr"))
+            if holdings:
+                return holdings
+
+        # Tier 3: Heuristic fallback loop disambiguating against decoy tables
+        for table in soup.find_all("table"):
+            header_text: str = table.get_text().lower()
+            if (
+                ("top holdings" in header_text or "holding" in header_text)
+                and "sector" not in header_text
+                and "country" not in header_text
+            ):
+                candidate_holdings: list[Holding] = self._extract_holdings_from_rows(
+                    table.find_all("tr")
+                )
+                if candidate_holdings:
+                    return candidate_holdings
+
+        return []
+
+    def _extract_sectors_from_rows(self, rows: list[Tag]) -> list[SectorExposure]:
+        """Extracts SectorExposure domain objects from HTML table row elements.
+
+        Args:
+            rows: List of BeautifulSoup Tag elements representing table rows.
+
+        Returns:
+            List of parsed SectorExposure objects with normalized percentages.
         """
         sectors: list[SectorExposure] = []
-        rows: list[Tag] = soup.find_all(
-            "tr",
-            {
-                "data-testid": lambda x: bool(
-                    x and "sector" in str(x).lower() and "row" in str(x).lower()
-                )
-            },
-        )
-        if not rows:
-            container_res: Any = soup.find("div", {"id": "sectors"})
-            container: Tag | None = container_res if isinstance(container_res, Tag) else None
-            if isinstance(container, Tag):
-                rows = container.find_all("tr")
-
-        if not rows:
-            for table in soup.find_all("table"):
-                header_text: str = table.get_text().lower()
-                if "sector" in header_text and "country" not in header_text:
-                    rows = table.find_all("tr")
-                    break
-
         for row in rows:
             cols: list[Tag] = row.find_all(["td", "th"])
             if len(cols) >= 2:
@@ -378,44 +377,61 @@ class JustETFClient:
                             weight_pct=weight_pct,
                         )
                     )
-
         return sectors
 
-    def _parse_countries(self, soup: BeautifulSoup) -> list[CountryExposure]:
-        """Parses the country or region breakdown table from the ETF profile page.
+    def _parse_sectors(self, soup: BeautifulSoup) -> list[SectorExposure]:
+        """Parses the sector breakdown table from the ETF profile page.
 
         Args:
             soup: Parsed BeautifulSoup object of the ETF profile page.
 
         Returns:
-            A list of CountryExposure domain objects.
+            A list of SectorExposure domain objects.
         """
-        countries: list[CountryExposure] = []
+        # Tier 1: Look for data-testid rows
         rows: list[Tag] = soup.find_all(
             "tr",
             {
                 "data-testid": lambda x: bool(
-                    x and "countr" in str(x).lower() and "row" in str(x).lower()
+                    x and "sector" in str(x).lower() and "row" in str(x).lower()
                 )
             },
         )
-        if not rows:
-            container_res: Any = soup.find("div", {"id": "countries"})
-            container: Tag | None = container_res if isinstance(container_res, Tag) else None
-            if isinstance(container, Tag):
-                rows = container.find_all("tr")
+        if rows:
+            sectors: list[SectorExposure] = self._extract_sectors_from_rows(rows)
+            if sectors:
+                return sectors
 
-        if not rows:
-            for table in soup.find_all("table"):
-                header_text: str = table.get_text().lower()
-                if (
-                    "country" in header_text
-                    or "countries" in header_text
-                    or "region" in header_text
-                ) and "sector" not in header_text:
-                    rows = table.find_all("tr")
-                    break
+        # Tier 2: Look for div container with id="sectors"
+        container_res: Any = soup.find("div", {"id": "sectors"})
+        container: Tag | None = container_res if isinstance(container_res, Tag) else None
+        if isinstance(container, Tag):
+            sectors = self._extract_sectors_from_rows(container.find_all("tr"))
+            if sectors:
+                return sectors
 
+        # Tier 3: Heuristic fallback loop disambiguating against decoy tables
+        for table in soup.find_all("table"):
+            header_text: str = table.get_text().lower()
+            if "sector" in header_text and "country" not in header_text:
+                candidate_sectors: list[SectorExposure] = self._extract_sectors_from_rows(
+                    table.find_all("tr")
+                )
+                if candidate_sectors:
+                    return candidate_sectors
+
+        return []
+
+    def _extract_countries_from_rows(self, rows: list[Tag]) -> list[CountryExposure]:
+        """Extracts CountryExposure domain objects from HTML table row elements.
+
+        Args:
+            rows: List of BeautifulSoup Tag elements representing table rows.
+
+        Returns:
+            List of parsed CountryExposure objects with canonical country mapping.
+        """
+        countries: list[CountryExposure] = []
         for row in rows:
             cols: list[Tag] = row.find_all(["td", "th"])
             if len(cols) >= 2:
@@ -441,8 +457,54 @@ class JustETFClient:
                             weight_pct=weight_pct,
                         )
                     )
-
         return countries
+
+    def _parse_countries(self, soup: BeautifulSoup) -> list[CountryExposure]:
+        """Parses the country or region breakdown table from the ETF profile page.
+
+        Args:
+            soup: Parsed BeautifulSoup object of the ETF profile page.
+
+        Returns:
+            A list of CountryExposure domain objects.
+        """
+        # Tier 1: Look for data-testid rows
+        rows: list[Tag] = soup.find_all(
+            "tr",
+            {
+                "data-testid": lambda x: bool(
+                    x and "countr" in str(x).lower() and "row" in str(x).lower()
+                )
+            },
+        )
+        if rows:
+            countries: list[CountryExposure] = self._extract_countries_from_rows(rows)
+            if countries:
+                return countries
+
+        # Tier 2: Look for div container with id="countries"
+        container_res: Any = soup.find("div", {"id": "countries"})
+        container: Tag | None = container_res if isinstance(container_res, Tag) else None
+        if isinstance(container, Tag):
+            countries = self._extract_countries_from_rows(container.find_all("tr"))
+            if countries:
+                return countries
+
+        # Tier 3: Heuristic fallback loop disambiguating against decoy tables
+        for table in soup.find_all("table"):
+            header_text: str = table.get_text().lower()
+            if (
+                "country" in header_text
+                or "countries" in header_text
+                or "region" in header_text
+            ) and "sector" not in header_text:
+                candidate_countries: list[CountryExposure] = self._extract_countries_from_rows(
+                    table.find_all("tr")
+                )
+                if candidate_countries:
+                    return candidate_countries
+
+        return []
 
     def _parse_ter(self, soup: BeautifulSoup) -> float | None:
         """Parses the Total Expense Ratio (TER) percentage from the ETF profile page.
@@ -454,18 +516,26 @@ class JustETFClient:
             The TER percentage as a float, or None if not found.
         """
         for label in soup.find_all(
-            string=re.compile(r"TER|Total\s*Expense\s*Ratio", re.IGNORECASE)
+            string=re.compile(r"\bTER\b|\bTotal\s*Expense\s*Ratio\b", re.IGNORECASE)
         ):
             parent: Tag | None = label.parent
             if parent:
                 search_scope: Tag = parent.parent if parent.parent else parent
-                text_content: str = search_scope.get_text()
+                text_content: str = search_scope.get_text(separator=" ")
                 match: re.Match[str] | None = re.search(
-                    r"(?:TER|Total\s*Expense\s*Ratio)[^%]*?(\d+[.,]?\d*)\s*%",
+                    r"(?:\bTER\b|\bTotal\s*Expense\s*Ratio\b)[^%]*?(\d+[.,]?\d*)\s*%",
                     text_content,
                     re.IGNORECASE,
                 )
                 if match:
                     return float(match.group(1).replace(",", "."))
+
+        fallback_match: re.Match[str] | None = re.search(
+            r"(?:\bTER\b|\bTotal\s*Expense\s*Ratio\b)[^%]*?(\d+[.,]?\d*)\s*%",
+            soup.get_text(separator=" "),
+            re.IGNORECASE,
+        )
+        if fallback_match:
+            return float(fallback_match.group(1).replace(",", "."))
 
         return None

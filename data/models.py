@@ -7,7 +7,7 @@ serialization, and market data representation.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -53,7 +53,7 @@ class Quotation(DictAccessMixin):
 
     price: float
     currency: str
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     native_price: float | None = None
     native_currency: str | None = None
 

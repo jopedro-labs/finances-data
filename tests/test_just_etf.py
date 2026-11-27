@@ -305,7 +305,10 @@ def test_parse_ter_parent_has_no_grandparent(client: JustETFClient) -> None:
 
 def test_parse_ter_fallback_when_dom_traversal_finds_no_number(client: JustETFClient) -> None:
     """DOM traversal finds label but no %-number; global text fallback kicks in."""
-    html = "<p>TER info only</p><body>Total Expense Ratio 0.33 %</body>"
+    html = (
+        "<body><section><div><p>TER</p></div></section>"
+        "<section><span>0.33 %</span></section></body>"
+    )
     assert client._parse_ter(_soup(html)) == pytest.approx(0.33)
 
 
@@ -635,9 +638,9 @@ def test_parse_retry_after_none_or_empty(client: JustETFClient) -> None:
 
 def test_parse_retry_after_http_date(client: JustETFClient) -> None:
     import email.utils
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
     future_date = email.utils.format_datetime(
-        datetime.now(timezone.utc).replace(microsecond=0)
+        datetime.now(UTC).replace(microsecond=0)
     )
     delay = client._parse_retry_after(future_date)
     assert 0.0 <= delay <= 10.0
@@ -690,3 +693,144 @@ def test_parse_fund_metadata_value_errors_logged(client: JustETFClient) -> None:
         assert "fund_size_eur_m" not in meta
         assert "holdings_count" not in meta
         assert "volatility_1y_pct" not in meta
+
+
+# ---------------------------------------------------------------------------
+# Decoy DOM Disambiguation Heuristic Tests
+# ---------------------------------------------------------------------------
+
+
+def test_parse_holdings_with_decoy_disclaimer_and_ad_tables(client: JustETFClient) -> None:
+    """Verify holdings parser ignores decoy disclaimer and ad tables that mention 'holding'."""
+    html: str = """
+    <html><body>
+      <table class="disclaimer-table">
+        <tr><th>Disclaimer</th><th>Notice</th></tr>
+        <tr>
+          <td>Important Notice: Past holding performance is not indicative of future results.</td>
+          <td>Legal</td>
+        </tr>
+      </table>
+      <table class="ad-banner">
+        <tr><td>Advertisement: Track top holdings with our premium subscription app.</td></tr>
+      </table>
+      <table class="content-table">
+        <tr><th>Top Holdings</th><th>ISIN</th><th>Weight</th></tr>
+        <tr>
+          <td><a href="/etf?isin=US0378331005">Apple Inc.</a></td>
+          <td>US0378331005</td>
+          <td>4.80 %</td>
+        </tr>
+        <tr>
+          <td><a href="/etf?isin=US5949181045">Microsoft Corp.</a></td>
+          <td>US5949181045</td>
+          <td>3.95 %</td>
+        </tr>
+      </table>
+    </body></html>
+    """
+    holdings = client._parse_holdings(BeautifulSoup(html, "html.parser"))
+    assert len(holdings) == 2
+    assert holdings[0].name == "Apple Inc."
+    assert holdings[0].isin == "US0378331005"
+    assert holdings[0].weight_pct == 4.80
+    assert holdings[1].name == "Microsoft Corp."
+    assert holdings[1].isin == "US5949181045"
+    assert holdings[1].weight_pct == 3.95
+
+
+def test_parse_sectors_with_decoy_sector_disclaimer_table(client: JustETFClient) -> None:
+    """Verify sectors parser skips non-data disclaimer tables mentioning 'sector'."""
+    html: str = """
+    <html><body>
+      <table class="disclaimer">
+        <tr><th>Sector Risk Notice</th></tr>
+        <tr>
+          <td>Investment in any specific sector carries cyclical market volatility risks.</td>
+        </tr>
+      </table>
+      <table class="data-table">
+        <tr><th>Sector Breakdown</th><th>Weight</th></tr>
+        <tr><td>Information Technology</td><td>26.50 %</td></tr>
+        <tr><td>Financials</td><td>14.20 %</td></tr>
+      </table>
+    </body></html>
+    """
+    sectors = client._parse_sectors(BeautifulSoup(html, "html.parser"))
+    assert len(sectors) == 2
+    assert sectors[0].sector_name == "Information Technology"
+    assert sectors[0].weight_pct == 26.50
+    assert sectors[1].sector_name == "Financials"
+    assert sectors[1].weight_pct == 14.20
+
+
+def test_parse_countries_with_decoy_country_notice_table(client: JustETFClient) -> None:
+    """Verify countries parser skips decoy tables mentioning 'country' without valid breakdown."""
+    html: str = """
+    <html><body>
+      <table class="regulatory-notice">
+        <tr><th>Country Regulatory Notice</th></tr>
+        <tr><td>This fund is not registered for distribution in your country or region.</td></tr>
+      </table>
+      <table class="country-allocation">
+        <tr><th>Country Breakdown</th><th>Weight</th></tr>
+        <tr><td>United States</td><td>65.00 %</td></tr>
+        <tr><td>Japan</td><td>5.80 %</td></tr>
+      </table>
+    </body></html>
+    """
+    countries = client._parse_countries(BeautifulSoup(html, "html.parser"))
+    assert len(countries) == 2
+    assert countries[0].country_name == "United States"
+    assert countries[0].weight_pct == 65.00
+    assert countries[1].country_name == "Japan"
+    assert countries[1].weight_pct == 5.80
+
+
+@patch("requests.Session.get")
+def test_full_etf_details_with_complex_decoy_dom(
+    mock_get: MagicMock, client: JustETFClient
+) -> None:
+    """Verify end-to-end get_etf_details against complex multi-table HTML full of decoy elements."""
+    complex_html: str = """
+    <html><body>
+      <div id="key-facts">
+        Inception Date\n15 Jan 2018\n
+        Replication\nPhysical (Full replication)\n
+        Distribution policy\nAccumulating\n
+        Index\nMorgan Stanley Capital International World\n
+        Fund currency\nEUR\n
+        Fund size\nEUR 1,250 m\n
+        Holdings\n1,500\n
+        Volatility 1 year\n12.50 %\n
+      </div>
+      <table><tr><th>TER</th><td>Total Expense Ratio: 0.20 %</td></tr></table>
+      <table class="decoy-banner">
+        <tr><td>Holdings, sectors, and country disclosures are refreshed monthly.</td></tr>
+      </table>
+      <table class="decoy-legal">
+        <tr><th>Holding Disclaimers</th><th>Country Regulations</th></tr>
+        <tr><td>Terms apply to all sector holdings.</td><td>Notice</td></tr>
+      </table>
+      <table id="top-holdings">
+        <tr><th>Holding</th><th>Weight</th></tr>
+        <tr><td><a href="/etf?isin=US0378331005">Apple</a></td><td>5.10 %</td></tr>
+      </table>
+      <div id="sectors">
+        <table><tr><td>Technology</td><td>30.00 %</td></tr></table>
+      </div>
+      <div id="countries">
+        <table><tr><td>United States</td><td>70.00 %</td></tr></table>
+      </div>
+    </body></html>
+    """
+    mock_get.return_value = _make_response(200, text=complex_html)
+    details = client.get_etf_details("IE00B4L5Y983")
+    assert details.ter_pct == 0.20
+    assert details.fund_size_eur_m == 1250.0
+    assert len(details.holdings) == 1
+    assert details.holdings[0].isin == "US0378331005"
+    assert len(details.sector_breakdown) == 1
+    assert details.sector_breakdown[0].sector_name == "Technology"
+    assert len(details.country_breakdown) == 1
+    assert details.country_breakdown[0].country_name == "United States"
