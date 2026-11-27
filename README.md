@@ -42,7 +42,7 @@ finances-data/
 │   └── QUALITY_AGENT.MD           # Quality assurance spec and audit guidelines
 ├── .github/
 │   └── workflows/
-│       ├── ci.yml                 # Matrix CI testing across Python 3.10-3.13, ruff, mypy, AUDIT sync
+│       ├── ci.yml                 # Matrix CI testing across Python 3.11-3.13, ruff, mypy, AUDIT sync
 │       ├── just_etf_bot.yml       # Scheduled canary monitor for JustETF scraper (Thursdays 20:00 UTC)
 │       ├── yahoo_bot.yml          # Scheduled canary monitor for Yahoo Finance API (Thursdays 20:00 UTC)
 │       └── publish.yml            # Automated PyPI publish workflow with version collision guards
@@ -146,7 +146,7 @@ The repository maintains automated scheduled canaries to detect third-party API 
 
 ### GitHub Actions Workflows
 
-- **`ci.yml`**: Multi-Python matrix (3.10, 3.11, 3.12, 3.13) verifying `ruff`, `mypy`, `pytest` with coverage, and enforcing `AUDIT.md` synchronization via `scripts/validate_audit_sync.py --enforce-sync`.
+- **`ci.yml`**: Multi-Python matrix (3.11, 3.12, 3.13) verifying `ruff`, `mypy`, `pytest` with coverage, and enforcing `AUDIT.md` synchronization via `scripts/validate_audit_sync.py --enforce-sync`.
 - **`just_etf_bot.yml`**: Scheduled health monitor running `scripts/just_etf_health_check.py` every Thursday at 20:00 UTC. Sends Discord alerts on failure and uploads error logs (`logs/just_etf_monitor.log`).
 - **`yahoo_bot.yml`**: Scheduled health monitor running `scripts/yahoo_health_check.py` every Thursday at 20:00 UTC. Validates live quote resolution for `IWDA.AS`, posts alerts to Discord, and uploads error logs (`logs/yahoo_monitor.log`).
 - **`publish.yml`**: Automated dispatch workflow publishing releases to PyPI with unbumped version and remote git tag collision guards.
