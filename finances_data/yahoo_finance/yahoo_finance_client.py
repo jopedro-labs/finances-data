@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, TypedDict, cast
 
 import pandas as pd
@@ -161,7 +161,7 @@ class YahooFinanceClient:
         return Quotation(
             price=price,
             currency=currency,
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.now(UTC),
             native_price=price,
             native_currency=currency,
         )

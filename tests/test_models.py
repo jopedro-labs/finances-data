@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -70,7 +70,7 @@ def test_dict_access_mixin() -> None:
 
 
 def test_quotation_to_dict() -> None:
-    dt = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+    dt = datetime(2026, 1, 1, 0, 0, tzinfo=UTC)
     quote = Quotation(
         price=150.0, currency="USD", timestamp=dt, native_price=150.0, native_currency="USD"
     )

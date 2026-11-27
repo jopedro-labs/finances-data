@@ -98,7 +98,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
 
 ## 3. Test Coverage Gaps
 
-- [ ] **Absence of Real / Recorded Integration Tests (0% Integration Coverage)**:
+- [x] **Absence of Real / Recorded Integration Tests (0% Integration Coverage)**:
   - Both `test_just_etf.py` and `test_yahoo_finance.py` rely entirely on `unittest.mock` (`unittest.mock.patch` of `requests.Session.get` and `yfinance.Ticker`).
   - There are zero tests running against live endpoints, recorded VCR cassettes (`pytest-recording` / `vcrpy`), or real HTTP DOM pages.
   - Changes in JustETF DOM markup or Yahoo Finance API field definitions pass the entire unit test suite undetected.
@@ -109,12 +109,12 @@ This document provides a factual, read-only comprehensive audit of the `finances
   - `.github/workflows/just_etf_bot.yml` merely runs mocked unit tests on push.
   - Acceptance Criteria: Create `scripts/just_etf_health_check.py` fetching a benchmark ETF (e.g., `IE00B4L5Y983`) against the live website, validating holdings, sectors, and TER parsing, and integrate it into `just_etf_bot.yml`.
 
-- [ ] **Decoy DOM Heuristic Vulnerabilities in Scraper Tests**:
+- [x] **Decoy DOM Heuristic Vulnerabilities in Scraper Tests**:
   - `tests/test_just_etf.py` tests fallback table selectors using isolated, single-table HTML snippets.
   - If a live JustETF page includes disclaimer tables, advertisement banners, or other non-holding tables containing the word "Holdings" prior to the actual table, heuristic parsing could bind to the wrong element.
   - Acceptance Criteria: Add integration/unit test fixtures featuring complex multi-table HTML structures with decoy tables to verify robust parser disambiguation.
 
-- [ ] **Test Coverage for Canary and Automation Scripts (`scripts/`)**:
+- [x] **Test Coverage for Canary and Automation Scripts (`scripts/`)**:
   - Automation scripts (`notify_discord.py`, `quality_eval_agent.py`, `yahoo_health_check.py`, `just_etf_health_check.py`) lack isolated unit tests verifying status codes, environment fallbacks, Discord error handling, and artifact generation.
   - Acceptance Criteria: Add `tests/test_scripts.py` exercising canary scripts with mocked HTTP responses, environment variable matrices, and failure branches.
 
@@ -150,7 +150,7 @@ This document provides a factual, read-only comprehensive audit of the `finances
     - Test directory naming convention: `tests/` is used instead of standard `tests/` used in `core-lib`.
   - Acceptance Criteria: Align `pyproject.toml` tool configuration, expand mypy/ruff inspection coverage, and evaluate standardizing directory naming to `tests/`.
 
-- [ ] **Strict Type Checking on `scripts.quality_eval_agent` and Python 3.11 Version Alignment in `pyproject.toml`**:
+- [x] **Strict Type Checking on `scripts.quality_eval_agent` and Python 3.11 Version Alignment in `pyproject.toml`**:
   - In `pyproject.toml`, `[[tool.mypy.overrides]]` currently sets `ignore_errors = true` for `scripts.quality_eval_agent`, masking type issues in that module.
   - `requires-python` (`>=3.10`), `[tool.ruff] target-version` (`py310`), and `[tool.mypy] python_version` (`3.10`) remain at `3.10` while CI workflows run on Python `3.11`.
   - Acceptance Criteria: Remove `ignore_errors = true` on `scripts.quality_eval_agent` once type annotations are verified, and align Python target versions in `pyproject.toml` with the `3.11` runtime environment.
